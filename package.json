@@ -1,0 +1,14 @@
+{
+  "name": "air-hockey",
+  "version": "1.0.0",
+  "description": "Simple Air Hockey game with Phaser",
+  "scripts": {
+    "start": "npx http-server -p 8080"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "puppeteer": "^5.5.0"
+  }
+}
