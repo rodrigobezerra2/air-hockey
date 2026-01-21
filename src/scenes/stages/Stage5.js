@@ -168,7 +168,6 @@ export class Stage5 extends BaseGameScene {
                 victimPaddle.stunned = true;
 
                 this.time.delayedCall(500, () => victimPaddle.stunned = false);
-                this.playFartSound();
             }
         });
         this.time.delayedCall(500, () => glove.destroy());

@@ -9,8 +9,15 @@ export const Persistence = {
         }
         return {
             coins: 0,
-            unlockedStages: 1
+            unlockedStages: 1,
+            language: 'en'
         };
+    },
+
+    setLanguage(lang) {
+        const data = this.getData();
+        data.language = lang;
+        this.saveData(data);
     },
 
     saveData(data) {
@@ -30,6 +37,10 @@ export const Persistence = {
             data.unlockedStages = stageNum;
             this.saveData(data);
         }
+    },
+
+    getSound() {
+        return undefined; // Deprecated
     },
 
     resetProgress() {

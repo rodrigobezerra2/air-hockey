@@ -1,3 +1,4 @@
+import { Localization } from '../utils/Localization.js';
 import { Persistence } from '../persistence.js';
 
 const STAGES = [
@@ -86,13 +87,13 @@ export class StageSelectScene extends Phaser.Scene {
         const data = Persistence.getData();
 
         // Header
-        this.add.text(600, 60, 'SELECT STAGE', { fontSize: '50px', fill: '#ffffff', fontStyle: 'bold' }).setOrigin(0.5);
+        this.add.text(600, 40, Localization.get('SELECT_STAGE'), { fontSize: '50px', fill: '#ffffff', fontStyle: 'bold' }).setOrigin(0.5);
 
         // Grid Layout
         const startX = 250;
-        const startY = 180;
-        const colW = 600; // Distance between columns
-        const rowH = 180; // Distance between rows (increased)
+        const startY = 150;
+        const colW = 700; // Fixes Horizontal Overlap (300/900 centers)
+        const rowH = 155; // Tighter rows to fit 4 rows
 
         STAGES.forEach((stage, index) => {
             const col = index % 2;
@@ -100,13 +101,15 @@ export class StageSelectScene extends Phaser.Scene {
             const x = startX + col * colW + (col === 0 ? 50 : -50); // Shift towards center slightly
             const y = startY + row * rowH;
 
-            this.createStageCard(stage, x, y, data.unlockedStages >= stage.id);
+            // Commented out lock check as requested: "comment out the code that blocks you"
+            // passing true to always show unlocked
+            this.createStageCard(stage, x, y, true); // data.unlockedStages >= stage.id
         });
 
         // Back Button
-        const backBtn = this.add.container(600, 750);
+        const backBtn = this.add.container(600, 760);
         const backBg = this.add.rectangle(0, 0, 200, 60, 0x333333).setStrokeStyle(2, 0xffffff);
-        const backTxt = this.add.text(0, 0, 'BACK', { fontSize: '24px', fill: '#ffffff' }).setOrigin(0.5);
+        const backTxt = this.add.text(0, 0, Localization.get('BACK'), { fontSize: '24px', fill: '#ffffff' }).setOrigin(0.5);
         backBtn.add([backBg, backTxt]);
 
         backBtn.setSize(200, 60).setInteractive()
@@ -140,14 +143,19 @@ export class StageSelectScene extends Phaser.Scene {
 
         // Text Info (Right)
         const titleColor = unlocked ? '#ffffff' : '#666666';
-        const title = this.add.text(-w / 2 + 170, -40, stage.name, {
+
+        // Localized Fields
+        const locName = Localization.get('STAGE_' + stage.id + '_NAME');
+        const locDesc = Localization.get('STAGE_' + stage.id + '_DESC');
+
+        const title = this.add.text(-w / 2 + 170, -40, locName, {
             fontSize: '28px',
             fill: titleColor,
             fontStyle: 'bold'
         });
 
         const descColor = unlocked ? '#aaaaaa' : '#444444';
-        const desc = this.add.text(-w / 2 + 170, 0, stage.desc, {
+        const desc = this.add.text(-w / 2 + 170, 0, locDesc, {
             fontSize: '18px',
             fill: descColor,
             wordWrap: { width: 320 }

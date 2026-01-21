@@ -62,12 +62,12 @@ export class Stage6 extends BaseGameScene {
             if (!puckSprite || !puckSprite.active) return;
 
             // Standard Goal Logic
-            // Check P2 Goal (Left side) x < 25
-            if (puckSprite.x < 25 && Math.abs(puckSprite.y - goalY) < goalH / 2 + 20) {
+            // Check P2 Goal (Left side) x < 50
+            if (puckSprite.x < 50 && Math.abs(puckSprite.y - goalY) < goalH / 2 + 20) {
                 this.onGoal('p2');
             }
             // Check P1 Goal (Right side)
-            else if (puckSprite.x > this.baseW - 25 && Math.abs(puckSprite.y - goalY) < goalH / 2 + 20) {
+            else if (puckSprite.x > this.baseW - 50 && Math.abs(puckSprite.y - goalY) < goalH / 2 + 20) {
                 this.onGoal('p1');
             }
         });
@@ -121,10 +121,12 @@ export class Stage6 extends BaseGameScene {
         }
 
         if (closestPuck) {
-            this.physics.moveTo(this.paddle2.sprite, closestPuck.x, closestPuck.y, 300 * this.scaleFactor);
+            // Target Safe Movement (Don't hump wall)
+            const safeX = Math.min(closestPuck.x, this.baseW * 0.85);
+            this.physics.moveTo(this.paddle2.sprite, safeX, closestPuck.y, 300 * this.scaleFactor);
         } else {
             // Return to idle
-            this.physics.moveTo(this.paddle2.sprite, this.baseW * 0.9, this.fieldH / 2, 200 * this.scaleFactor);
+            this.physics.moveTo(this.paddle2.sprite, this.baseW * 0.85, this.fieldH / 2, 200 * this.scaleFactor);
         }
     }
 }

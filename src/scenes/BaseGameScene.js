@@ -1,3 +1,4 @@
+import { Localization } from '../utils/Localization.js';
 import { Persistence } from '../persistence.js';
 import { Paddle } from '../entities/Paddle.js';
 import { Puck } from '../entities/Puck.js';
@@ -32,6 +33,7 @@ export class BaseGameScene extends Phaser.Scene {
         this.input.addPointer(2);
 
         this.setupEntities();
+
         this.setupUI();
     }
 
@@ -72,6 +74,17 @@ export class BaseGameScene extends Phaser.Scene {
         this.physics.add.collider(this.puck.sprite, this.paddle2.sprite, (p, pad) => this.hitPaddle(p, pad));
     }
 
+    hitPaddle(puck, paddle) {
+        // ... existing physics logic is handled by collider, but we can add bounce boost if needed
+        if (paddle === this.paddle2.sprite) console.log('CPU TOUCHED PUCK');
+        // Override in subclasses
+        const angle = Phaser.Math.Angle.Between(paddle.x, paddle.y, puck.x, puck.y);
+        const speed = Phaser.Math.Distance.Between(0, 0, puck.body.velocity.x, puck.body.velocity.y);
+        if (speed < 200 * this.scaleFactor) {
+            this.physics.velocityFromRotation(angle, 350 * this.scaleFactor, puck.body.velocity);
+        }
+    }
+
     setupUI() {
         this.scoreText1 = this.add.text(this.baseW * 0.25, 50, '0', { fontSize: '64px', fill: '#ff0000' }).setScrollFactor(0);
         this.scoreText2 = this.add.text(this.baseW * 0.75, 50, '0', { fontSize: '64px', fill: '#0000ff' }).setScrollFactor(0);
@@ -88,133 +101,302 @@ export class BaseGameScene extends Phaser.Scene {
         });
 
         // Madness Mode Text
-        this.crazyModeText = this.add.text(this.baseW / 2, 120, 'MADNESS MODE ENABLED', {
+        this.crazyModeText = this.add.text(this.baseW / 2, 120, Localization.get('MADNESS_MODE_ENABLED'), {
             fontSize: '40px', fill: '#ffff00', fontStyle: 'bold'
         }).setOrigin(0.5).setVisible(!this.restrictField).setScrollFactor(0);
 
-        this.add.text(this.baseW / 2, this.baseH - 50, 'QUIT', { fontSize: '24px', fill: '#ffffff' })
-            .setOrigin(0.5).setInteractive().on('pointerdown', () => this.scene.start('MenuScene'));
+        // Settings Cog (Top Right)
+        // Fixed to Screen (using this.scale.width, not world width)
+        this.add.text(this.scale.width - 50, 50, '⚙️', { fontSize: '40px' })
+            .setOrigin(0.5).setInteractive().setScrollFactor(0)
+            .on('pointerdown', () => this.openSettings());
+
+        // Mobile Controls (If touch detected)
+        // Check touch or just add them for testing if requested. 
+        // Mobile Controls (If touch detected AND not on desktop)
+        // Ensure strictly mobile/tablet experience
+        if (!this.sys.game.device.os.desktop && this.sys.game.device.input.touch) {
+            this.createVirtualControls();
+        }
     }
 
-    hitPaddle(puckSprite, paddleSprite) {
-        if (paddleSprite === this.paddle2.sprite) console.log('CPU TOUCHED PUCK');
-        const angle = Phaser.Math.Angle.Between(paddleSprite.x, paddleSprite.y, puckSprite.x, puckSprite.y);
-        const speed = Phaser.Math.Distance.Between(0, 0, puckSprite.body.velocity.x, puckSprite.body.velocity.y);
-        if (speed < 200 * this.scaleFactor) {
-            this.physics.velocityFromRotation(angle, 350 * this.scaleFactor, puckSprite.body.velocity);
+    openSettings() {
+        if (this.isPaused) return;
+        this.isPaused = true;
+        this.physics.world.pause();
+
+        // Create Modal Container
+        this.settingsModal = this.add.container(0, 0).setScrollFactor(0).setDepth(100);
+
+        // Background (dim)
+        // Panel Border
+        const panelW = 500;
+        const panelH = 600;
+        const panel = this.add.graphics();
+        panel.lineStyle(4, 0x00ff00);
+        panel.fillStyle(0x000000, 0.9);
+        const panelRect = new Phaser.Geom.Rectangle(this.baseW / 2 - panelW / 2, this.baseH / 2 - panelH / 2, panelW, panelH);
+        panel.strokeRectShape(panelRect);
+        panel.fillRectShape(panelRect);
+        this.settingsModal.add(panel);
+
+        // Background (dim) - Click to Resume
+        const bg = this.add.rectangle(this.baseW / 2, this.baseH / 2, this.baseW, this.baseH, 0x000000, 0.8)
+            .setInteractive()
+            .on('pointerdown', (pointer) => {
+                // Check if click is outside panel
+                if (!panelRect.contains(pointer.x, pointer.y)) {
+                    this.closeSettings();
+                }
+            });
+        this.settingsModal.add(bg);
+
+        // Ensure background is BEHIND panel (panel was added first, so send bg to back)
+        this.settingsModal.sendToBack(bg);
+
+        // Standard Button Style
+        const createBtn = (y, label, callback, color = '#ffffff') => {
+            const btnText = this.add.text(this.baseW / 2, y, label, {
+                fontSize: '40px', fill: color, fontStyle: 'bold'
+            }).setOrigin(0.5).setInteractive();
+
+            btnText.on('pointerdown', callback);
+            btnText.on('pointerover', () => btnText.setScale(1.1));
+            btnText.on('pointerout', () => btnText.setScale(1.0));
+            this.settingsModal.add(btnText);
+            return btnText;
+        };
+
+        // Resume
+        createBtn(this.baseH * 0.25, Localization.get('RESUME'), () => this.closeSettings());
+
+        // Language Flags (Row)
+        const langs = Localization.getAllLanguages();
+        const langY = this.baseH * 0.51;
+        const langGap = 100;
+        const langStartX = this.baseW / 2 - ((langs.length - 1) * langGap) / 2;
+
+        langs.forEach((lang, index) => {
+            const x = langStartX + index * langGap;
+            const flagKey = Localization.getFlag(lang); // Returns texture key 'flag_en', etc.
+            const isSelected = (Localization.getCurrentLanguage() === lang);
+
+            // Background for selection
+            if (isSelected) {
+                const bg = this.add.rectangle(x, langY, 70, 54, 0x444444).setOrigin(0.5);
+                this.settingsModal.add(bg);
+            }
+
+            // Using this.add.image instead of text
+            const flagBtn = this.add.image(x, langY, flagKey).setOrigin(0.5).setInteractive();
+            flagBtn.setDisplaySize(60, 40);
+
+            flagBtn.on('pointerdown', () => {
+                Localization.setLanguage(lang);
+                // Restart Settings to refresh text
+                this.settingsModal.destroy();
+                this.isPaused = false;
+                this.openSettings();
+            });
+
+            flagBtn.on('pointerover', () => flagBtn.setDisplaySize(66, 44));
+            flagBtn.on('pointerout', () => flagBtn.setDisplaySize(60, 40));
+
+            this.settingsModal.add(flagBtn);
+        });
+
+        // Stage Select
+        createBtn(this.baseH * 0.64, Localization.get('STAGE_SELECT'), () => {
+            this.closeSettings(); // Clean up
+            this.scene.start('StageSelectScene');
+        });
+
+        // Main Menu
+        createBtn(this.baseH * 0.77, Localization.get('MAIN_MENU'), () => {
+            this.closeSettings();
+            this.scene.start('MenuScene');
+        });
+    }
+
+    closeSettings() {
+        this.isPaused = false;
+        this.physics.world.resume();
+        if (this.settingsModal) {
+            this.settingsModal.destroy();
+            this.settingsModal = null;
         }
+    }
+
+    createVirtualControls() {
+        this.virtualInput = {
+            p1: { up: false, down: false, left: false, right: false },
+            p2: { up: false, down: false, left: false, right: false }
+        };
+
+        const createDPad = (x, y, playerKey, isArrows) => {
+            const size = 60;
+            const alpha = 0.3;
+            const color = 0x888888;
+
+            // Helper to make button
+            const makeBtn = (bx, by, keyDir, label) => {
+                const btn = this.add.circle(bx, by, size, color).setAlpha(alpha).setScrollFactor(0).setInteractive();
+                const text = this.add.text(bx, by, label, { fontSize: '32px', fontStyle: 'bold' }).setOrigin(0.5).setScrollFactor(0);
+
+                btn.on('pointerdown', () => this.virtualInput[playerKey][keyDir] = true);
+                btn.on('pointerup', () => this.virtualInput[playerKey][keyDir] = false);
+                btn.on('pointerout', () => this.virtualInput[playerKey][keyDir] = false);
+            };
+
+            makeBtn(x, y - size * 1.5, 'up', isArrows ? '↑' : 'W');
+            makeBtn(x, y + size * 1.5, 'down', isArrows ? '↓' : 'S');
+            makeBtn(x - size * 1.5, y, 'left', isArrows ? '←' : 'A');
+            makeBtn(x + size * 1.5, y, 'right', isArrows ? '→' : 'D');
+        };
+
+        // P1 D-Pad (Left Bottom)
+        createDPad(150, this.baseH - 150, 'p1', false);
+
+        // P2 D-Pad (Right Bottom)
+        createDPad(this.baseW - 150, this.baseH - 150, 'p2', true);
     }
 
     update(time, delta) {
-        if (this.matchEnded) return;
-        this.handleInput(delta);
-        this.handleAI();
-        this.enforceBoundaries();
-        this.checkGoals();
-    }
+        if (this.matchEnded || this.isPaused) return;
 
-    handleInput(delta) {
-        // P1 Input
+        // --- Player 1 Input ---
         let p1Vx = 0, p1Vy = 0;
         const isGravityStage = this.isGravityStage;
 
-        // Keyboard
-        const left = this.keysWASD.left.isDown || (this.gameMode === '1p' && this.cursors.left.isDown);
-        const right = this.keysWASD.right.isDown || (this.gameMode === '1p' && this.cursors.right.isDown);
-        const up = this.keysWASD.up.isDown || (this.gameMode === '1p' && this.cursors.up.isDown);
-        const down = this.keysWASD.down.isDown || (this.gameMode === '1p' && this.cursors.down.isDown);
+        // Combine Keyboard & Virtual
+        const k1 = this.keysWASD;
+        const v1 = this.virtualInput ? this.virtualInput.p1 : { up: false, down: false, left: false, right: false };
 
-        if (left) { p1Vx = -600; this.paddle1.facing = -1; }
-        else if (right) { p1Vx = 600; this.paddle1.facing = 1; }
+        const up = k1.up.isDown || v1.up;
+        const down = k1.down.isDown || v1.down;
+        const left = k1.left.isDown || v1.left;
+        const right = k1.right.isDown || v1.right;
 
-        // Y-Axis Logic
+        // P1 Movement logic
         if (isGravityStage) {
-            // Gravity Mode: Up = Jump, Down = Fast Fall
-            const hasBody = this.paddle1 && this.paddle1.sprite && this.paddle1.sprite.body;
-            if (hasBody) {
-                if (up && this.paddle1.sprite.body.blocked.down) {
-                    this.paddle1.setVelocityY(-600);
-                } else if (down) {
-                    this.paddle1.setVelocityY(600);
-                }
+            // Gravity Logic...
+            if (left) p1Vx = -600;
+            else if (right) p1Vx = 600;
+
+            if (up && this.paddle1.sprite.body.blocked.down) {
+                this.paddle1.setVelocityY(-600);
+            } else if (down) {
+                this.paddle1.setVelocityY(600);
             }
         } else {
-            // Classic Mode: Direct Velocity Control
+            // Classic Logic
             if (up) p1Vy = -600;
             else if (down) p1Vy = 600;
+
+            if (left) p1Vx = -600;
+            else if (right) p1Vx = 600;
         }
 
-        // Mouse/Touch (Override keyboard if active)
+        // Direct Touch Logic (Only if NOT using virtual buttons to avoid conflict?)
+        // Actually, user might use D-Pad OR Touch.
+        // Touch mainly for 1P or "Air Hockey" feel mechanics.
         if (this.input.activePointer.isDown) {
             const ptr = this.input.activePointer;
-            const canMove = (this.gameMode === '1p') || (!this.restrictField) || (ptr.x < this.baseW / 2);
+            // Only process direct touch if NOT clicking a UI element (interactive check)
+            // But simple check: Is it in the game area?
+            // Actually, if using D-Pad, activePointer is busy on the button. 
+            // So we primarily check if NO keys are pressed.
 
-            if (canMove) {
-                if (ptr.x < this.paddle1.x) this.paddle1.facing = -1; else this.paddle1.facing = 1;
+            /* 
+               Improved Touch Follow: Proportional Speed
+            */
+            const isTouchingUI = (ptr.y > this.baseH - 250 && (ptr.x < 300 || ptr.x > this.baseW - 300)) && (this.virtualInput);
 
-                if (isGravityStage) {
-                    // Touch Gravity: Follow X, Tap/Hold high to jump?
-                    if (ptr.x < this.paddle1.x - 10) p1Vx = -600;
-                    else if (ptr.x > this.paddle1.x + 10) p1Vx = 600;
+            if (!isTouchingUI) {
+                const canMove = (this.gameMode === '1p') || (!this.restrictField) || (ptr.x < this.baseW / 2);
 
-                    if (ptr.y < this.paddle1.y - 50 && this.paddle1.sprite.body.blocked.down) {
-                        this.paddle1.setVelocityY(-600);
-                    }
-                } else {
-                    const dist = Phaser.Math.Distance.Between(this.paddle1.x, this.paddle1.y, ptr.x, ptr.y);
-                    if (dist > 15) {
-                        const angle = Phaser.Math.Angle.Between(this.paddle1.x, this.paddle1.y, ptr.x, ptr.y);
-                        const vec = this.physics.velocityFromRotation(angle, 600);
-                        p1Vx = vec.x; p1Vy = vec.y;
+                if (canMove) {
+                    if (ptr.x < this.paddle1.x) this.paddle1.facing = -1; else this.paddle1.facing = 1;
+
+                    if (isGravityStage) {
+                        // Touch Gravity Logic...
+                        if (ptr.x < this.paddle1.x - 10) p1Vx = -600;
+                        else if (ptr.x > this.paddle1.x + 10) p1Vx = 600;
+                        if (ptr.y < this.paddle1.y - 50 && this.paddle1.sprite.body.blocked.down) {
+                            this.paddle1.setVelocityY(-600);
+                        }
                     } else {
-                        p1Vx = 0; p1Vy = 0;
+                        // Standard Mode: Proportional Catchup
+                        const dist = Phaser.Math.Distance.Between(this.paddle1.x, this.paddle1.y, ptr.x, ptr.y);
+                        if (dist > 15) {
+                            const angle = Phaser.Math.Angle.Between(this.paddle1.x, this.paddle1.y, ptr.x, ptr.y);
+
+                            // NEW: Speed scales with distance. 
+                            // Min 600, Max 2000? 
+                            // avg move: dist 100 -> speed 1000?
+                            const speed = Math.max(600, Math.min(dist * 15, 1800));
+
+                            const vec = this.physics.velocityFromRotation(angle, speed);
+                            p1Vx = vec.x; p1Vy = vec.y;
+                        } else {
+                            // Close enough, stop jitter
+                            // p1Vx/Vy already 0
+                        }
                     }
                 }
             }
         }
 
-        // Apply Final Velocity
+        // Apply P1
         if (isGravityStage) {
             if (!this.paddle1.stunned) this.paddle1.setVelocityX(p1Vx);
-            // Vy is handled by physics or explicit jump commands above
         } else {
             if (!this.paddle1.stunned) this.paddle1.setVelocity(p1Vx, p1Vy);
         }
 
-        // P2 (if 2P)
+        // --- Player 2 Input ---
         if (this.gameMode === '2p') {
             let p2Vx = 0, p2Vy = 0;
-            if (this.cursors.left.isDown) p2Vx = -600;
-            else if (this.cursors.right.isDown) p2Vx = 600;
+            const k2 = this.cursors;
+            const v2 = this.virtualInput ? this.virtualInput.p2 : { up: false, down: false, left: false, right: false };
+
+            const up2 = k2.up.isDown || v2.up;
+            const down2 = k2.down.isDown || v2.down;
+            const left2 = k2.left.isDown || v2.left;
+            const right2 = k2.right.isDown || v2.right;
+
+            // P2 Logic
+            if (left2) p2Vx = -600;
+            else if (right2) p2Vx = 600;
 
             if (isGravityStage) {
-                if (this.cursors.up.isDown && this.paddle2.sprite.body.blocked.down) this.paddle2.setVelocityY(-600);
-                else if (this.cursors.down.isDown) this.paddle2.setVelocityY(600);
+                if (up2 && this.paddle2.sprite.body.blocked.down) this.paddle2.setVelocityY(-600);
+                else if (down2) this.paddle2.setVelocityY(600);
                 this.paddle2.setVelocityX(p2Vx);
             } else {
-                if (this.cursors.up.isDown) p2Vy = -600;
-                else if (this.cursors.down.isDown) p2Vy = 600;
+                if (up2) p2Vy = -600;
+                else if (down2) p2Vy = 600;
                 this.paddle2.setVelocity(p2Vx, p2Vy);
             }
         }
-    }
+        if (this.restrictField) {
+            // P1 Bounds (Left Half)
+            // Right limit for P1: baseW/2 - radius
+            if (this.paddle1.x > this.baseW / 2 - this.PADDLE_RADIUS) {
+                this.paddle1.x = this.baseW / 2 - this.PADDLE_RADIUS;
+                if (this.paddle1.body.velocity.x > 0) this.paddle1.setVelocityX(0);
+            }
 
-    enforceBoundaries() {
-        if (!this.restrictField) return;
-
-        // P1 Bounds (Left Half)
-        // Right limit for P1: baseW/2 - radius
-        if (this.paddle1.x > this.baseW / 2 - this.PADDLE_RADIUS) {
-            this.paddle1.x = this.baseW / 2 - this.PADDLE_RADIUS;
-            if (this.paddle1.body.velocity.x > 0) this.paddle1.setVelocityX(0);
+            // P2 Bounds (Right Half)
+            // Left limit for P2: baseW/2 + radius
+            if (this.paddle2.x < this.baseW / 2 + this.PADDLE_RADIUS) {
+                this.paddle2.x = this.baseW / 2 + this.PADDLE_RADIUS;
+                if (this.paddle2.body.velocity.x < 0) this.paddle2.setVelocityX(0);
+            }
         }
 
-        // P2 Bounds (Right Half)
-        // Left limit for P2: baseW/2 + radius
-        if (this.paddle2.x < this.baseW / 2 + this.PADDLE_RADIUS) {
-            this.paddle2.x = this.baseW / 2 + this.PADDLE_RADIUS;
-            if (this.paddle2.body.velocity.x < 0) this.paddle2.setVelocityX(0);
-        }
+        this.handleAI();
+        this.checkGoals();
     }
 
     handleAI() {
@@ -234,8 +416,8 @@ export class BaseGameScene extends Phaser.Scene {
             }
 
             if (isStuck) {
-                // Retreat logic
-                const retreatX = this.baseW * 0.9;
+                // Retreat logic - Back off to 85% width (safer from wall)
+                const retreatX = this.baseW * 0.85;
                 const retreatY = this.fieldY + this.fieldH / 2;
 
                 if (isGravityStage) {
@@ -266,6 +448,10 @@ export class BaseGameScene extends Phaser.Scene {
                     }
                 } else {
                     // Top-Down AI
+                    // Prevent AI from repeatedly ramming wall in Madness Mode
+                    // If target is beyond safe bounds, clamp it or stop?
+                    // Actually, if simply chasing puck, let it crash (it's "Madness").
+                    // BUT for "Stuck" logic above, we fixed retreatX.
                     this.physics.moveTo(this.paddle2.sprite, this.puck.x, this.puck.y, 300 * this.scaleFactor);
                 }
             }
@@ -278,15 +464,11 @@ export class BaseGameScene extends Phaser.Scene {
         const centerY = this.fieldY + this.fieldH / 2;
 
         // Determine Goal Y Position
-        // Stage 4+: Goals are at the BOTTOM corners (implied by gravity/platformer style?)
-        // Wait, drawField says: (this.fieldY + this.fieldH - this.GOAL_SIZE)
-        // Check previously viewed drawField logic (Line 54)
         const goalY = (this.isGravityStage) ? (this.fieldY + this.fieldH - this.GOAL_SIZE / 2) : (centerY);
-        // Note: drawField draws rect at 'y'. Rect origin is top-left.
-        // If drawField: y = fieldH - GOAL_SIZE. Center of that rect is fieldH - GOAL_SIZE/2.
 
-        if (this.puck.x < 25 && Math.abs(this.puck.y - goalY) < this.GOAL_SIZE / 2 + 20) this.onGoal('p2');
-        if (this.puck.x > this.baseW - 25 && Math.abs(this.puck.y - goalY) < this.GOAL_SIZE / 2 + 20) this.onGoal('p1');
+        // Increase threshold to 50 (radius 20 + 30 buffer) to catch fast bounces
+        if (this.puck.x < 50 && Math.abs(this.puck.y - goalY) < this.GOAL_SIZE / 2 + 20) this.onGoal('p2');
+        if (this.puck.x > this.baseW - 50 && Math.abs(this.puck.y - goalY) < this.GOAL_SIZE / 2 + 20) this.onGoal('p1');
     }
 
     onGoal(scorer) {
@@ -301,7 +483,7 @@ export class BaseGameScene extends Phaser.Scene {
             this.scoreText2.setText(this.score2);
             this.showFartCloud('left');
         }
-        this.playFartSound(); // Restore Sound
+        // this.playFartSound(); // Removed/Replaced
         this.totalGoals++;
         if (this.totalGoals >= 3) {
             this.matchEnded = true;
@@ -311,25 +493,8 @@ export class BaseGameScene extends Phaser.Scene {
         }
     }
 
-    playFartSound() {
-        const AC = window.AudioContext || window.webkitAudioContext;
-        if (!AC) return; const ctx = new AC(); const osc = ctx.createOscillator(); const gain = ctx.createGain();
-        osc.type = 'sawtooth'; osc.frequency.setValueAtTime(150, ctx.currentTime); osc.frequency.exponentialRampToValueAtTime(50, ctx.currentTime + 0.5);
-        gain.gain.setValueAtTime(1, ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
-        osc.connect(gain); gain.connect(ctx.destination); osc.start(); osc.stop(ctx.currentTime + 0.5);
-    }
-
     showFartCloud(side) {
-        if (!this.textures.exists('cloud')) { const g = this.make.graphics({ x: 0, y: 0, add: false }); g.fillStyle(0x00ff00, 1); g.fillCircle(20, 20, 20); g.generateTexture('cloud', 40, 40); }
-        const particles = this.add.particles(0, 0, 'cloud', { speed: { min: -50, max: 50 }, angle: { min: 0, max: 360 }, scale: { start: 2 * this.scaleFactor, end: 4 * this.scaleFactor }, alpha: { start: 0.3, end: 0 }, lifespan: 5000, frequency: -1, quantity: 20 });
-        const centerY = this.fieldY + this.fieldH / 2;
-        const xPos = side === 'left' ? this.baseW * 0.2 : this.baseW * 0.8;
-        particles.explode(20, xPos, centerY);
-        this.time.delayedCall(6000, () => { if (particles) particles.destroy(); });
-        const fog = this.add.graphics(); fog.fillStyle(0x00aa00, 0.2);
-        if (side === 'left') fog.fillRect(0, this.fieldY, this.baseW / 2, this.fieldH);
-        else fog.fillRect(this.baseW / 2, this.fieldY, this.baseW / 2, this.fieldH);
-        this.tweens.add({ targets: fog, alpha: 0, duration: 1000, delay: 4000, onComplete: () => fog.destroy() });
+        // Animation disabled
     }
 
     resetRound(loserSide) {
