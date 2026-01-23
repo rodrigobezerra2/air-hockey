@@ -30,13 +30,14 @@ export class Stage5 extends BaseGameScene {
 
     setupEntities() {
         const startY = this.fieldY + this.fieldH - 50; // Start at bottom
+        this.p1SpawnX = 100 * this.scaleFactor;
+        this.p1SpawnY = startY;
+        this.p2SpawnX = this.baseW - 100 * this.scaleFactor;
+        this.p2SpawnY = startY;
 
-        // Simpler: Call super, then move them.
         super.setupEntities();
-        this.paddle1.reset(100 * this.scaleFactor, startY);
-        this.paddle2.reset(this.baseW - 100 * this.scaleFactor, startY);
 
-        // Re-enable gravity just in case reset cleared it (it shouldn't, but checks are good)
+        // Re-enable gravity just in case reset cleared it
         if (this.paddle1.sprite.body) this.paddle1.sprite.body.setImmovable(false);
         if (this.paddle2.sprite.body) this.paddle2.sprite.body.setImmovable(false);
     }
@@ -120,10 +121,10 @@ export class Stage5 extends BaseGameScene {
         if (this.gameMode !== '1p') return;
 
         const dist = Phaser.Math.Distance.Between(this.paddle2.x, this.paddle2.y, this.paddle1.x, this.paddle1.y);
-        if (this.paddle2.x < this.paddle1.x - 60) { this.paddle2.setVelocity(200, 0); }
-        else if (this.paddle2.x > this.paddle1.x + 60) { this.paddle2.setVelocity(-200, 0); }
+        if (this.paddle2.x < this.paddle1.x - 60) { this.paddle2.setVelocityX(200); }
+        else if (this.paddle2.x > this.paddle1.x + 60) { this.paddle2.setVelocityX(-200); }
         else {
-            this.paddle2.setVelocity(0, 0);
+            this.paddle2.setVelocityX(0);
             if (this.p2CanPunch) this.tryPunch('p2');
         }
     }
@@ -173,17 +174,15 @@ export class Stage5 extends BaseGameScene {
         this.time.delayedCall(500, () => glove.destroy());
     }
 
-    // Override resetRound to avoid Puck crash and reset players
-    resetRound(loserSide) {
-        // Reset Players to starting positions
-        const startY = this.fieldY + this.fieldH - 50;
-        this.paddle1.reset(100 * this.scaleFactor, startY);
-        this.paddle2.reset(this.baseW - 100 * this.scaleFactor, startY);
-
+    resetEntities() {
+        if (this.paddle1) this.paddle1.reset(this.p1SpawnX, this.p1SpawnY);
+        if (this.paddle2) this.paddle2.reset(this.p2SpawnX, this.p2SpawnY);
         // Ensure gravity is still valid
-        if (this.paddle1.sprite.body) this.paddle1.sprite.body.setImmovable(false);
-        if (this.paddle2.sprite.body) this.paddle2.sprite.body.setImmovable(false);
+        if (this.paddle1 && this.paddle1.sprite.body) this.paddle1.sprite.body.setImmovable(false);
+        if (this.paddle2 && this.paddle2.sprite.body) this.paddle2.sprite.body.setImmovable(false);
     }
+
+    // inherited onGoal, showCelebration, startReadyGoSequence handle the reset logic now
 
     generateGloveTexture() {
         if (this.textures.exists('glove')) return;

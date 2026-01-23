@@ -12,11 +12,16 @@ export class Stage8 extends BaseGameScene {
 
     setupEntities() {
         const centerY = this.fieldY + this.fieldH / 2;
+        this.p1SpawnX = 100 * this.scaleFactor;
+        this.p1SpawnY = centerY;
+        this.p2SpawnX = this.baseW - 200 * this.scaleFactor;
+        this.p2SpawnY = centerY;
+
         // P1 is normal
-        this.paddle1 = new Paddle(this, 100 * this.scaleFactor, centerY, this.PADDLE_RADIUS, 0xff0000, 0xffaaaa);
+        this.paddle1 = new Paddle(this, this.p1SpawnX, this.p1SpawnY, this.PADDLE_RADIUS, 0xff0000, 0xffaaaa);
 
         // P2 is the BOSS: 5 times bigger
-        this.paddle2 = new Paddle(this, this.baseW - 200 * this.scaleFactor, centerY, this.bossRadius, 0x0000ff, 0xaaaaff);
+        this.paddle2 = new Paddle(this, this.p2SpawnX, this.p2SpawnY, this.bossRadius, 0x0000ff, 0xaaaaff);
 
         this.createPuck();
     }

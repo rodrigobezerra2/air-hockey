@@ -73,21 +73,14 @@ export class Stage6 extends BaseGameScene {
         });
     }
 
-    // Override resetRound to REUSE pucks instead of destroying them
-    resetRound(loserSide) {
+    resetEntities() {
         // Reset Player Position (Standard)
-        const centerY = this.fieldY + this.fieldH / 2;
-        this.paddle1.reset(100 * this.scaleFactor, centerY);
-        this.paddle2.reset(this.baseW - 100 * this.scaleFactor, centerY);
+        if (this.paddle1) this.paddle1.reset(this.p1SpawnX, this.p1SpawnY);
+        if (this.paddle2) this.paddle2.reset(this.p2SpawnX, this.p2SpawnY);
 
         // REUSE Pucks to equidistant positions
-        // Puck 1 -> Top 1/3
-        this.puck1.reset(this.baseW / 2, this.fieldY + (this.fieldH / 3));
-
-        // Puck 2 -> Bottom 2/3
-        this.puck2.reset(this.baseW / 2, this.fieldY + (this.fieldH * 2 / 3));
-
-        this.matchEnded = false;
+        if (this.puck1) this.puck1.reset(this.baseW / 2, this.fieldY + (this.fieldH / 3));
+        if (this.puck2) this.puck2.reset(this.baseW / 2, this.fieldY + (this.fieldH * 2 / 3));
     }
 
     // Force kick for fast bounce (Solving "Glued" issue)

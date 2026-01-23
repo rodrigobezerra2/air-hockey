@@ -16,6 +16,7 @@ export class BaseGameScene extends Phaser.Scene {
         this.fieldH = 800;
         this.GOAL_SIZE = 200;
         this.PADDLE_RADIUS = 30;
+        this.isWaitingForStart = false;
     }
 
     create() {
@@ -35,6 +36,9 @@ export class BaseGameScene extends Phaser.Scene {
         this.setupEntities();
 
         this.setupUI();
+
+        // Match Start Sequence
+        this.startReadyGoSequence();
     }
 
     configureField() {
@@ -60,8 +64,13 @@ export class BaseGameScene extends Phaser.Scene {
 
     setupEntities() {
         const centerY = this.fieldY + this.fieldH / 2;
-        this.paddle1 = new Paddle(this, 100 * this.scaleFactor, centerY, this.PADDLE_RADIUS, 0xff0000, 0xffaaaa);
-        this.paddle2 = new Paddle(this, this.baseW - 100 * this.scaleFactor, centerY, this.PADDLE_RADIUS, 0x0000ff, 0xaaaaff);
+        this.p1SpawnX = 100 * this.scaleFactor;
+        this.p1SpawnY = centerY;
+        this.p2SpawnX = this.baseW - 100 * this.scaleFactor;
+        this.p2SpawnY = centerY;
+
+        this.paddle1 = new Paddle(this, this.p1SpawnX, this.p1SpawnY, this.PADDLE_RADIUS, 0xff0000, 0xffaaaa);
+        this.paddle2 = new Paddle(this, this.p2SpawnX, this.p2SpawnY, this.PADDLE_RADIUS, 0x0000ff, 0xaaaaff);
 
         // Puck (Override-able for stages without puck)
         this.createPuck();
@@ -262,7 +271,7 @@ export class BaseGameScene extends Phaser.Scene {
     }
 
     update(time, delta) {
-        if (this.matchEnded || this.isPaused) return;
+        if (this.matchEnded || this.isPaused || this.isWaitingForStart) return;
 
         // --- Player 1 Input ---
         let p1Vx = 0, p1Vy = 0;
@@ -472,6 +481,10 @@ export class BaseGameScene extends Phaser.Scene {
     }
 
     onGoal(scorer) {
+        if (this.matchEnded || this.isWaitingForStart) return;
+
+        this.isWaitingForStart = true;
+
         if (scorer === 'p1') {
             const newTotal = Persistence.addCoins(50);
             this.coinText.setText('x ' + newTotal);
@@ -483,22 +496,123 @@ export class BaseGameScene extends Phaser.Scene {
             this.scoreText2.setText(this.score2);
             this.showFartCloud('left');
         }
-        // this.playFartSound(); // Removed/Replaced
+
         this.totalGoals++;
+
+        // Immediate Fireworks
+        const goalX = (scorer === 'p1') ? this.baseW : 0;
+        const goalY = this.fieldY + this.fieldH / 2;
+        this.createFireworks(goalX, goalY);
+
         if (this.totalGoals >= 3) {
             this.matchEnded = true;
-            this.scene.start('ResultScene', { mode: this.gameMode, stage: this.stageNum, score1: this.score1, score2: this.score2 });
+            // Freeze movement
+            if (this.puck) this.puck.body.setVelocity(0, 0);
+            if (this.paddle1) this.paddle1.setVelocity(0, 0);
+            if (this.paddle2) this.paddle2.setVelocity(0, 0);
+
+            this.showScoreText(scorer);
+            this.time.delayedCall(1000, () => {
+                this.scene.start('ResultScene', { mode: this.gameMode, stage: this.stageNum, score1: this.score1, score2: this.score2 });
+            });
         } else {
-            this.resetRound(scorer === 'p1' ? 'right' : 'left');
+            this.resetEntities();
+            this.startReadyGoSequence(scorer);
         }
+    }
+
+    showScoreText(scorer) {
+        if (!scorer) return;
+        // Blinking SCORE
+        const scoreSideX = (scorer === 'p1') ? this.baseW * 0.25 : this.baseW * 0.75;
+        const scoreTxt = this.add.text(scoreSideX, this.fieldH / 2, 'SCORE', {
+            fontSize: '80px',
+            fill: '#ffffff',
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 8
+        }).setOrigin(0.5);
+
+        // Blink effect
+        this.tweens.add({
+            targets: scoreTxt,
+            alpha: 0,
+            duration: 200,
+            ease: 'Linear',
+            yoyo: true,
+            repeat: 5,
+            onComplete: () => scoreTxt.destroy()
+        });
+    }
+
+    createFireworks(x, y) {
+        for (let i = 0; i < 20; i++) {
+            const circle = this.add.circle(x, y, 5, 0xffffff);
+            const angle = Math.random() * Math.PI * 2;
+            const dist = Math.random() * 200 + 100;
+            const color = Phaser.Display.Color.RandomRGB();
+            circle.setFillStyle(color.color);
+
+            this.tweens.add({
+                targets: circle,
+                x: x + Math.cos(angle) * dist,
+                y: y + Math.sin(angle) * dist,
+                alpha: 0,
+                scale: 2,
+                duration: 1000,
+                ease: 'Power2',
+                onComplete: () => circle.destroy()
+            });
+        }
+    }
+
+    startReadyGoSequence(scorer = null) {
+        this.isWaitingForStart = true;
+        this.resetEntities();
+
+        // Show Score Text (synced with READY)
+        if (scorer) this.showScoreText(scorer);
+
+        // Clear any old ready text
+        if (this.readyText) this.readyText.destroy();
+
+        // READY...
+        this.readyText = this.add.text(this.baseW / 2, 150, 'READY...', {
+            fontSize: '100px',
+            fill: '#ffff00',
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 10
+        }).setOrigin(0.5);
+
+        this.time.delayedCall(1000, () => {
+            if (this.readyText) {
+                this.readyText.setText('GO!');
+                this.readyText.setFill('#00ff00');
+            }
+            this.isWaitingForStart = false; // Move now!
+
+            this.time.delayedCall(1000, () => {
+                if (this.readyText) this.readyText.destroy();
+                this.readyText = null;
+            });
+        });
     }
 
     showFartCloud(side) {
         // Animation disabled
     }
 
+    resetEntities() {
+        const centerY = this.fieldY + this.fieldH / 2;
+        if (this.paddle1) this.paddle1.reset(this.p1SpawnX, this.p1SpawnY);
+        if (this.paddle2) this.paddle2.reset(this.p2SpawnX, this.p2SpawnY);
+        if (this.puck) this.puck.reset(this.baseW / 2, centerY);
+    }
+
     resetRound(loserSide) {
-        this.puck.reset(this.baseW / 2, this.fieldY + this.fieldH / 2);
+        const centerY = this.fieldY + this.fieldH / 2;
+        if (this.puck) this.puck.reset(this.baseW / 2, centerY);
         const serveSpeed = 300 * this.scaleFactor;
         const randomY = Phaser.Math.Between(-200, 200);
         this.puck.body.setVelocity(loserSide === 'left' ? -serveSpeed : serveSpeed, randomY);

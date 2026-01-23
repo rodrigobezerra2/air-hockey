@@ -9,7 +9,7 @@ export class Stage9 extends BaseGameScene {
         this.fieldH = 800;
         this.PADDLE_RADIUS = 25;
         this.SHOOT_FORCE = 1200;
-        this.RELOAD_TIME = 5000;
+        this.RELOAD_TIME = 4000;
     }
 
     create() {
@@ -39,10 +39,6 @@ export class Stage9 extends BaseGameScene {
 
         // Cannon Graphics
         this.cannons = this.add.graphics();
-
-        // Initial Reload
-        this.time.delayedCall(1000, () => this.reloadPlayer(1));
-        this.time.delayedCall(1000, () => this.reloadPlayer(2));
 
         this.createTargets();
     }
@@ -171,7 +167,9 @@ export class Stage9 extends BaseGameScene {
             this.scoreText2.setText(this.score2);
         }
 
-        // Immediate reload on hit
+        // NO interruptive celebration/reset logic as requested
+
+        // Immediate reload on hit (seamless)
         if (this['p' + pNum + 'ReloadTimer']) {
             this['p' + pNum + 'ReloadTimer'].remove();
         }
@@ -179,7 +177,9 @@ export class Stage9 extends BaseGameScene {
 
         if (this.score1 >= 3 || this.score2 >= 3) {
             this.matchEnded = true;
-            this.time.delayedCall(500, () => this.scene.start('ResultScene', { score1: this.score1, score2: this.score2, stage: 9 }));
+            this.isWaitingForStart = true;
+            this.showScoreText(pNum === 1 ? 'p1' : 'p2');
+            this.time.delayedCall(1000, () => this.scene.start('ResultScene', { score1: this.score1, score2: this.score2, stage: 9 }));
         }
     }
 
@@ -221,4 +221,50 @@ export class Stage9 extends BaseGameScene {
         this.cannons.fillCircle(x, y, 40);
     }
 
+    setupEntities() {
+        const centerY = this.fieldY + this.fieldH / 2;
+        this.p1SpawnX = 50;
+        this.p1SpawnY = this.fieldH - 50;
+        this.p2SpawnX = this.baseW - 50;
+        this.p2SpawnY = this.fieldH - 50;
+
+        super.setupEntities();
+    }
+
+    startReadyGoSequence(scorer = null) {
+        // We override this to just show the text at the start, 
+        // because reloadPlayer handles the player positions.
+        this.isWaitingForStart = true;
+
+        if (scorer) this.showScoreText(scorer);
+
+        // Clear any old ready text
+        if (this.readyText) this.readyText.destroy();
+
+        // READY...
+        this.readyText = this.add.text(this.baseW / 2, 150, 'READY...', {
+            fontSize: '100px',
+            fill: '#ffff00',
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 10
+        }).setOrigin(0.5);
+
+        this.time.delayedCall(1000, () => {
+            if (this.readyText) {
+                this.readyText.setText('GO!');
+                this.readyText.setFill('#00ff00');
+            }
+            this.isWaitingForStart = false;
+
+            // Trigger initial reload when GO happens
+            this.reloadPlayer(1);
+            this.reloadPlayer(2);
+
+            this.time.delayedCall(1000, () => {
+                if (this.readyText) this.readyText.destroy();
+                this.readyText = null;
+            });
+        });
+    }
 }
