@@ -72,6 +72,27 @@ const STAGES = [
             g.fillStyle(0x00ff00);
             g.fillCircle(w / 4, h / 2, 8); g.fillCircle(3 * w / 4, h / 2, 8);
         }
+    },
+    {
+        id: 8, name: "BOSS!",
+        desc: "Time to defeat the boss!",
+        render: (g, w, h) => {
+            g.lineStyle(2, 0x444444); g.strokeRect(0, 0, w, h);
+            g.fillStyle(0xff0000); g.fillCircle(w / 4, h / 2, 6);
+            g.fillStyle(0x0000ff); g.fillCircle(3 * w / 4, h / 2, 40);
+        }
+    },
+    {
+        id: 9, name: "CANNONS!",
+        desc: "Blast off!",
+        render: (g, w, h) => {
+            g.lineStyle(2, 0x444444); g.strokeRect(0, 0, w, h);
+            g.fillStyle(0x555555);
+            g.fillRect(10, h - 30, 30, 20); // P1 Cannon
+            g.fillRect(w - 40, h - 30, 30, 20); // P2 Cannon
+            g.fillStyle(0xff0000); g.fillCircle(15, h - 25, 5); // P1 Ball
+            g.fillStyle(0x0000ff); g.fillCircle(w - 15, h - 25, 5); // P2 Ball
+        }
     }
 ];
 

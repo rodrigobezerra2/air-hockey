@@ -10,10 +10,12 @@ A 2D Air Hockey game built with Phaser 3, Antigravity, a "prompt engineer" (me) 
     - **Stage 2**: LONG FIELD - Can you score from further away?
     - **Stage 3**: FIELD FLIPPED? - Careful on this one!
     - **Stage 4**: FOOTBALL - Time to score some goals! (Gravity Mode)
-    - **Stage 5**: MADNESS - Fight for your life! (Fighting Mode)
+    - **Stage 5**: BOXING - Press down to bump your opponent!
     - **Stage 6**: DOUBLE BALLS - Two is better than one.
     - **Stage 7**: OBSTACLES - Can you hit the goal? (Obstacle Mode)
-- **Madness Mode**: Press 'R' to remove field restrictions (for fun!).
+    - **Stage 8**: BOSS! - Time to defeat the boss! (Giant Opponent)
+    - **Stage 9**: CANNONS! - Blast off! (Target Practice)
+- **Freedom Mode**: Press 'R' to remove field restrictions (for fun!).
 - **Currency System**: Earn coins for scoring and winning stages.
 - **Persistence**: Progress is saved automatically.
 
