@@ -12,6 +12,8 @@ import { Stage6 } from './scenes/stages/Stage6.js';
 import { Stage7 } from './scenes/stages/Stage7.js';
 import { Stage8 } from './scenes/stages/Stage8.js';
 import { Stage9 } from './scenes/stages/Stage9.js';
+import { Stage10 } from './scenes/stages/Stage10.js';
+import { ShopScene } from './scenes/ShopScene.js';
 
 const config = {
     type: Phaser.AUTO,
@@ -33,7 +35,9 @@ const config = {
         Stage6,
         Stage7,
         Stage8,
-        Stage9
+        Stage9,
+        Stage10,
+        ShopScene
     ]
 };
 

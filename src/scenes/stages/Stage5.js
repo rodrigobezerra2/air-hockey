@@ -35,7 +35,9 @@ export class Stage5 extends BaseGameScene {
         this.p2SpawnX = this.baseW - 100 * this.scaleFactor;
         this.p2SpawnY = startY;
 
-        super.setupEntities();
+        this.paddle1 = new Paddle(this, this.p1SpawnX, this.p1SpawnY, this.PADDLE_RADIUS, 0xff0000, 0xffaaaa, 'p1');
+        this.paddle2 = new Paddle(this, this.p2SpawnX, this.p2SpawnY, this.PADDLE_RADIUS, 0x0000ff, 0xaaaaff, 'p2');
+        this.createPuck();
 
         // Re-enable gravity just in case reset cleared it
         if (this.paddle1.sprite.body) this.paddle1.sprite.body.setImmovable(false);

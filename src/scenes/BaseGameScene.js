@@ -2,6 +2,7 @@ import { Localization } from '../utils/Localization.js';
 import { Persistence } from '../persistence.js';
 import { Paddle } from '../entities/Paddle.js';
 import { Puck } from '../entities/Puck.js';
+import { VanityManager } from '../utils/VanityManager.js';
 
 export class BaseGameScene extends Phaser.Scene {
     constructor(key) { super({ key: key }); }
@@ -17,13 +18,22 @@ export class BaseGameScene extends Phaser.Scene {
         this.GOAL_SIZE = 200;
         this.PADDLE_RADIUS = 30;
         this.isWaitingForStart = false;
+
+        // Stage 10 / Goalie Mode support
+        this.isGoalieMode = false;
+        this.aiControlP1 = false;
+        this.goal1Y = 0; // Relative to field
+        this.goal2Y = 0; // Relative to field
+        this.fieldGraphics = null;
     }
 
     create() {
         this.score1 = 0; this.score2 = 0; this.totalGoals = 0; this.matchEnded = false;
         this.restrictField = true;
+        VanityManager.generateTextures(this);
 
         this.configureField(); // Override-able
+        this.setupGoalPositions(); // Centrally handle defaults if not set
 
         // Common Graphics
         this.drawField();
@@ -42,24 +52,154 @@ export class BaseGameScene extends Phaser.Scene {
     }
 
     configureField() {
-        // Default config
+        // Stages override this
+    }
+
+    setupGoalPositions() {
+        // If goals are still at 0, apply defaults
+        const centerY = this.fieldY + this.fieldH / 2;
+        const defaultY = (this.isGravityStage) ? (this.fieldY + this.fieldH - this.GOAL_SIZE) : (centerY - this.GOAL_SIZE / 2);
+
+        if (this.goal1Y === 0) this.goal1Y = defaultY;
+        if (this.goal2Y === 0) this.goal2Y = defaultY;
     }
 
     drawField() {
         this.cameras.main.centerOn(this.baseW / 2, this.baseH / 2);
         this.physics.world.setBounds(0, this.fieldY, this.baseW, this.fieldH);
 
-        const g = this.add.graphics();
-        g.lineStyle(4, 0x444444);
+        const bgId = Persistence.getEquipped('world', 'background');
+
+        // Use a persistent graphics object if not already created
+        if (!this.fieldGraphics) {
+            this.fieldGraphics = this.add.graphics();
+        }
+        const g = this.fieldGraphics;
+        g.clear();
+
+        // 1. Theme-Specific Background
+        this.drawWorldBackground(g, bgId);
+
+        // 2. Field Lines
+        g.lineStyle(4, 0xffffff, 0.2); // Faint white lines
         g.strokeRect(0, this.fieldY, this.baseW, this.fieldH);
         const centerX = this.baseW / 2, centerY = this.fieldY + this.fieldH / 2;
         g.beginPath(); g.moveTo(centerX, this.fieldY); g.lineTo(centerX, this.fieldY + this.fieldH); g.strokePath();
         g.strokeCircle(centerX, centerY, 100 * this.scaleFactor);
 
-        // Goals
-        const goalY = (this.isGravityStage) ? (this.fieldY + this.fieldH - this.GOAL_SIZE) : (centerY - this.GOAL_SIZE / 2);
-        g.fillStyle(0xaa0000, 0.5); g.fillRect(0, goalY, 10 * this.scaleFactor, this.GOAL_SIZE);
-        g.fillStyle(0x0000aa, 0.5); g.fillRect(this.baseW - 10 * this.scaleFactor, goalY, 10 * this.scaleFactor, this.GOAL_SIZE);
+        // 3. Goals
+        g.fillStyle(0xaa0000, 0.5); g.fillRect(0, this.goal1Y, 10 * this.scaleFactor, this.GOAL_SIZE);
+        g.fillStyle(0x0000aa, 0.5); g.fillRect(this.baseW - 10 * this.scaleFactor, this.goal2Y, 10 * this.scaleFactor, this.GOAL_SIZE);
+    }
+
+    drawWorldBackground(g, id) {
+        const { baseW, baseH, fieldY, fieldH } = this;
+        const centerY = fieldY + fieldH / 2;
+
+        if (!id) {
+            g.fillStyle(0x000000);
+            g.fillRect(0, fieldY, baseW, fieldH);
+            return;
+        }
+
+        switch (id) {
+            case 'world_lava':
+                g.fillStyle(0x1a0500); g.fillRect(0, fieldY, baseW, fieldH);
+                // Volcanoes
+                for (let i = 0; i < 3; i++) {
+                    const vx = 200 + i * 400, vy = fieldY + 150;
+                    g.fillStyle(0x331100);
+                    g.beginPath(); g.moveTo(vx - 150, fieldY + fieldH); g.lineTo(vx, vy); g.lineTo(vx + 150, fieldY + fieldH); g.fillPath();
+                    g.fillStyle(0xff4400); // Lava top
+                    g.beginPath(); g.moveTo(vx - 30, vy); g.lineTo(vx + 30, vy); g.lineTo(vx + 50, vy + 40); g.lineTo(vx - 50, vy + 40); g.fillPath();
+                }
+                g.fillStyle(0xff6600, 0.2); // Heat ripples
+                for (let i = 0; i < 30; i++) g.fillCircle(Math.random() * baseW, fieldY + Math.random() * fieldH, 20 + Math.random() * 40);
+                break;
+
+            case 'world_snow':
+                g.fillStyle(0xccf2ff); g.fillRect(0, fieldY, baseW, fieldH);
+                // Icebergs
+                g.fillStyle(0xffffff, 0.8);
+                for (let i = 0; i < 5; i++) {
+                    const ix = 100 + i * 250, iy = fieldY + 200 + Math.random() * 200;
+                    g.beginPath(); g.moveTo(ix - 80, fieldY + fieldH); g.lineTo(ix, iy); g.lineTo(ix + 80, fieldY + fieldH); g.fillPath();
+                }
+                g.fillStyle(0x00ccff, 0.3); // Frost patterns
+                for (let i = 0; i < 20; i++) g.fillRect(Math.random() * baseW, fieldY + Math.random() * fieldH, 100, 2);
+                break;
+
+            case 'world_forest':
+                g.fillStyle(0x0a2200); g.fillRect(0, fieldY, baseW, fieldH);
+                // Trees
+                for (let i = 0; i < 15; i++) {
+                    const tx = Math.random() * baseW, ty = fieldY + 100 + Math.random() * 500;
+                    g.fillStyle(0x331a00); g.fillRect(tx - 5, ty, 10, 40); // Trunk
+                    g.fillStyle(0x004400); g.beginPath(); g.moveTo(tx - 30, ty); g.lineTo(tx, ty - 60); g.lineTo(tx + 30, ty); g.fillPath(); // Leaves
+                }
+                // Waterfall (stylized)
+                g.fillStyle(0x44aaff, 0.6); g.fillRect(baseW / 2 - 40, fieldY, 80, fieldH);
+                g.fillStyle(0xffffff, 0.4);
+                for (let i = 0; i < 20; i++) g.fillRect(baseW / 2 - 40 + Math.random() * 80, fieldY + Math.random() * fieldH, 2, 20);
+                break;
+
+            case 'world_moon':
+                g.fillStyle(0x111111); g.fillRect(0, fieldY, baseW, fieldH);
+                g.fillStyle(0x333333); // Craters
+                for (let i = 0; i < 15; i++) g.fillCircle(Math.random() * baseW, fieldY + Math.random() * fieldH, 20 + Math.random() * 50);
+                // Alien
+                const ax = 150, ay = fieldY + 150;
+                g.fillStyle(0x00ff00); g.fillEllipse(ax, ay, 30, 40); // Head
+                g.fillStyle(0x000000); g.fillCircle(ax - 10, ay - 5, 5); g.fillCircle(ax + 10, ay - 5, 5); // Eyes
+                // Spaceship
+                const sx = baseW - 200, sy = fieldY + 200;
+                g.fillStyle(0x888888); g.fillEllipse(sx, sy, 80, 30); // Saucer
+                g.fillStyle(0x44aaff); g.fillCircle(sx, sy - 10, 15); // Dome
+                break;
+
+            case 'world_sky':
+                g.fillStyle(0x00ccff); g.fillRect(0, fieldY, baseW, fieldH);
+                g.fillStyle(0xffffff, 0.8);
+                for (let i = 0; i < 12; i++) {
+                    const cx = Math.random() * baseW, cy = fieldY + Math.random() * fieldH;
+                    g.fillCircle(cx, cy, 40); g.fillCircle(cx + 30, cy + 10, 30); g.fillCircle(cx - 30, cy + 10, 30);
+                }
+                break;
+
+            case 'world_underwater':
+                g.fillStyle(0x001133); g.fillRect(0, fieldY, baseW, fieldH);
+                // Whale
+                g.fillStyle(0x334466); g.fillEllipse(300, centerY - 100, 150, 60);
+                g.beginPath(); g.moveTo(150, centerY - 100); g.lineTo(100, centerY - 130); g.lineTo(100, centerY - 70); g.fillPath(); // Tail
+                // Shark
+                g.fillStyle(0x667788); g.fillEllipse(baseW - 300, centerY + 100, 80, 30);
+                g.beginPath(); g.moveTo(baseW - 300, centerY + 85); g.lineTo(baseW - 315, centerY + 70); g.lineTo(baseW - 285, centerY + 85); g.fillPath(); // Fin
+                // Octopus
+                const ox = 150, oy = centerY + 150;
+                g.fillStyle(0xaa4466); g.fillCircle(ox, oy, 25);
+                for (let i = 0; i < 8; i++) {
+                    const ang = (i * Math.PI * 2) / 8;
+                    g.lineStyle(6, 0xaa4466);
+                    g.lineBetween(ox, oy, ox + Math.cos(ang) * 40, oy + Math.sin(ang) * 40);
+                }
+                break;
+
+            case 'world_city':
+                g.fillStyle(0x050510); g.fillRect(0, fieldY, baseW, fieldH);
+                // Skyscrapers
+                for (let i = 0; i < 20; i++) {
+                    const sw = 40 + Math.random() * 60;
+                    const sh = 100 + Math.random() * 400;
+                    const sx = i * 70;
+                    g.fillStyle(0x1a1a2e); g.fillRect(sx, fieldY + fieldH - sh, sw, sh);
+                    g.fillStyle(0xffff00, 0.4); // Windows
+                    for (let j = 0; j < 5; j++) g.fillRect(sx + 10, fieldY + fieldH - sh + 20 + j * 40, 10, 10);
+                }
+                // Stadium
+                g.fillStyle(0x444444); g.fillEllipse(baseW / 2, fieldY + fieldH - 50, 300, 100);
+                g.lineStyle(4, 0x00ff00); g.strokeEllipse(baseW / 2, fieldY + fieldH - 50, 280, 80);
+                break;
+        }
     }
 
     setupEntities() {
@@ -69,8 +209,8 @@ export class BaseGameScene extends Phaser.Scene {
         this.p2SpawnX = this.baseW - 100 * this.scaleFactor;
         this.p2SpawnY = centerY;
 
-        this.paddle1 = new Paddle(this, this.p1SpawnX, this.p1SpawnY, this.PADDLE_RADIUS, 0xff0000, 0xffaaaa);
-        this.paddle2 = new Paddle(this, this.p2SpawnX, this.p2SpawnY, this.PADDLE_RADIUS, 0x0000ff, 0xaaaaff);
+        this.paddle1 = new Paddle(this, this.p1SpawnX, this.p1SpawnY, this.PADDLE_RADIUS, 0xff0000, 0xffaaaa, 'p1');
+        this.paddle2 = new Paddle(this, this.p2SpawnX, this.p2SpawnY, this.PADDLE_RADIUS, 0x0000ff, 0xaaaaff, 'p2');
 
         // Puck (Override-able for stages without puck)
         this.createPuck();
@@ -78,19 +218,27 @@ export class BaseGameScene extends Phaser.Scene {
 
     createPuck() {
         const centerY = this.fieldY + this.fieldH / 2;
-        this.puck = new Puck(this, this.baseW / 2, centerY, 20 * this.scaleFactor);
+        let radius = 20 * this.scaleFactor;
+        this.puck = new Puck(this, this.baseW / 2, centerY, radius);
         this.physics.add.collider(this.puck.sprite, this.paddle1.sprite, (p, pad) => this.hitPaddle(p, pad));
         this.physics.add.collider(this.puck.sprite, this.paddle2.sprite, (p, pad) => this.hitPaddle(p, pad));
     }
 
     hitPaddle(puck, paddle) {
-        // ... existing physics logic is handled by collider, but we can add bounce boost if needed
-        if (paddle === this.paddle2.sprite) console.log('CPU TOUCHED PUCK');
-        // Override in subclasses
+        if (Persistence.isModifierActive('knockback')) {
+            const padObj = (paddle === this.paddle1.sprite) ? this.paddle1 : this.paddle2;
+            const angle = Phaser.Math.Angle.Between(puck.x, puck.y, paddle.x, paddle.y);
+            const force = 400;
+            padObj.setVelocity(Math.cos(angle) * force, Math.sin(angle) * force);
+        }
+
+        // ... velocity boost logic
         const angle = Phaser.Math.Angle.Between(paddle.x, paddle.y, puck.x, puck.y);
         const speed = Phaser.Math.Distance.Between(0, 0, puck.body.velocity.x, puck.body.velocity.y);
-        if (speed < 200 * this.scaleFactor) {
-            this.physics.velocityFromRotation(angle, 350 * this.scaleFactor, puck.body.velocity);
+        const minSpeed = 350 * this.scaleFactor * (Persistence.isModifierActive('halfSpeed') ? 0.5 : 1);
+
+        if (speed < minSpeed) {
+            this.physics.velocityFromRotation(angle, minSpeed, puck.body.velocity);
         }
     }
 
@@ -273,9 +421,15 @@ export class BaseGameScene extends Phaser.Scene {
     update(time, delta) {
         if (this.matchEnded || this.isPaused || this.isWaitingForStart) return;
 
+        // Apply Speed Modifiers
+        let speedMult = 1;
+        if (Persistence.isModifierActive('halfSpeed')) speedMult = 0.5;
+        if (Persistence.isModifierActive('twiceSpeed')) speedMult = 2;
+
         // --- Player 1 Input ---
         let p1Vx = 0, p1Vy = 0;
         const isGravityStage = this.isGravityStage;
+        const baseSpeed = 600 * speedMult;
 
         // Combine Keyboard & Virtual
         const k1 = this.keysWASD;
@@ -289,36 +443,26 @@ export class BaseGameScene extends Phaser.Scene {
         // P1 Movement logic
         if (isGravityStage) {
             // Gravity Logic...
-            if (left) p1Vx = -600;
-            else if (right) p1Vx = 600;
+            if (left) p1Vx = -baseSpeed;
+            else if (right) p1Vx = baseSpeed;
 
             if (up && this.paddle1.sprite.body.blocked.down) {
-                this.paddle1.setVelocityY(-600);
+                this.paddle1.setVelocityY(-baseSpeed);
             } else if (down) {
-                this.paddle1.setVelocityY(600);
+                this.paddle1.setVelocityY(baseSpeed);
             }
         } else {
             // Classic Logic
-            if (up) p1Vy = -600;
-            else if (down) p1Vy = 600;
+            if (up) p1Vy = -baseSpeed;
+            else if (down) p1Vy = baseSpeed;
 
-            if (left) p1Vx = -600;
-            else if (right) p1Vx = 600;
+            if (left) p1Vx = -baseSpeed;
+            else if (right) p1Vx = baseSpeed;
         }
 
-        // Direct Touch Logic (Only if NOT using virtual buttons to avoid conflict?)
-        // Actually, user might use D-Pad OR Touch.
-        // Touch mainly for 1P or "Air Hockey" feel mechanics.
+        // Direct Touch Logic
         if (this.input.activePointer.isDown) {
             const ptr = this.input.activePointer;
-            // Only process direct touch if NOT clicking a UI element (interactive check)
-            // But simple check: Is it in the game area?
-            // Actually, if using D-Pad, activePointer is busy on the button. 
-            // So we primarily check if NO keys are pressed.
-
-            /* 
-               Improved Touch Follow: Proportional Speed
-            */
             const isTouchingUI = (ptr.y > this.baseH - 250 && (ptr.x < 300 || ptr.x > this.baseW - 300)) && (this.virtualInput);
 
             if (!isTouchingUI) {
@@ -328,28 +472,18 @@ export class BaseGameScene extends Phaser.Scene {
                     if (ptr.x < this.paddle1.x) this.paddle1.facing = -1; else this.paddle1.facing = 1;
 
                     if (isGravityStage) {
-                        // Touch Gravity Logic...
-                        if (ptr.x < this.paddle1.x - 10) p1Vx = -600;
-                        else if (ptr.x > this.paddle1.x + 10) p1Vx = 600;
+                        if (ptr.x < this.paddle1.x - 10) p1Vx = -baseSpeed;
+                        else if (ptr.x > this.paddle1.x + 10) p1Vx = baseSpeed;
                         if (ptr.y < this.paddle1.y - 50 && this.paddle1.sprite.body.blocked.down) {
-                            this.paddle1.setVelocityY(-600);
+                            this.paddle1.setVelocityY(-baseSpeed);
                         }
                     } else {
-                        // Standard Mode: Proportional Catchup
                         const dist = Phaser.Math.Distance.Between(this.paddle1.x, this.paddle1.y, ptr.x, ptr.y);
                         if (dist > 15) {
                             const angle = Phaser.Math.Angle.Between(this.paddle1.x, this.paddle1.y, ptr.x, ptr.y);
-
-                            // NEW: Speed scales with distance. 
-                            // Min 600, Max 2000? 
-                            // avg move: dist 100 -> speed 1000?
-                            const speed = Math.max(600, Math.min(dist * 15, 1800));
-
+                            const speed = Math.max(baseSpeed, Math.min(dist * 15 * speedMult, 1800 * speedMult));
                             const vec = this.physics.velocityFromRotation(angle, speed);
                             p1Vx = vec.x; p1Vy = vec.y;
-                        } else {
-                            // Close enough, stop jitter
-                            // p1Vx/Vy already 0
                         }
                     }
                 }
@@ -375,16 +509,16 @@ export class BaseGameScene extends Phaser.Scene {
             const right2 = k2.right.isDown || v2.right;
 
             // P2 Logic
-            if (left2) p2Vx = -600;
-            else if (right2) p2Vx = 600;
+            if (left2) p2Vx = -baseSpeed;
+            else if (right2) p2Vx = baseSpeed;
 
             if (isGravityStage) {
-                if (up2 && this.paddle2.sprite.body.blocked.down) this.paddle2.setVelocityY(-600);
-                else if (down2) this.paddle2.setVelocityY(600);
+                if (up2 && this.paddle2.sprite.body.blocked.down) this.paddle2.setVelocityY(-baseSpeed);
+                else if (down2) this.paddle2.setVelocityY(baseSpeed);
                 this.paddle2.setVelocityX(p2Vx);
             } else {
-                if (up2) p2Vy = -600;
-                else if (down2) p2Vy = 600;
+                if (up2) p2Vy = -baseSpeed;
+                else if (down2) p2Vy = baseSpeed;
                 this.paddle2.setVelocity(p2Vx, p2Vy);
             }
         }
@@ -406,78 +540,107 @@ export class BaseGameScene extends Phaser.Scene {
 
         this.handleAI();
         this.checkGoals();
+
+        // In Goalie Mode, re-draw field EVERY frame if goals move
+        if (this.isGoalieMode) {
+            // Handle input for P1 Goal
+            const goalieSpeed = 800;
+            const k1 = this.keysWASD;
+            const v1 = this.virtualInput ? this.virtualInput.p1 : { up: false, down: false };
+            const up = k1.up.isDown || v1.up;
+            const down = k1.down.isDown || v1.down;
+
+            if (up) this.goal1Y -= goalieSpeed * (delta / 1000);
+            if (down) this.goal1Y += goalieSpeed * (delta / 1000);
+
+            // Constraints
+            this.goal1Y = Phaser.Math.Clamp(this.goal1Y, this.fieldY, this.fieldY + this.fieldH - this.GOAL_SIZE);
+
+            this.drawField();
+        }
     }
 
     handleAI() {
-        // Base AI (Follow Puck)
-        if (this.gameMode === '1p' && this.puck) {
-            const isGravityStage = this.isGravityStage;
-            const dist = Phaser.Math.Distance.Between(this.paddle2.x, this.paddle2.y, this.puck.x, this.puck.y);
+        if (!this.puck) return;
 
-            // Stuck/Pinning Prevention (Reduced)
-            // Only back off if the puck is BEHIND us (to our right), forcing us to reposition.
-            let isStuck = false;
+        let aiSpeed = 300 * this.scaleFactor;
+        if (Persistence.isModifierActive('hardMode')) aiSpeed *= 2;
 
-            // If we are excessively close (overlapping)
-            if (dist < this.PADDLE_RADIUS * 1.5) {
-                // If Puck is to our RIGHT (towards our goal/behind us), we need to get behind it. Back off.
-                if (this.puck.x > this.paddle2.x) isStuck = true;
+        // --- P2 AI ---
+        if (this.gameMode === '1p' || this.isGoalieMode) {
+            this.updatePaddleAI(this.paddle2, aiSpeed);
+        }
+
+        // --- P1 AI ---
+        if (this.aiControlP1) {
+            this.updatePaddleAI(this.paddle1, aiSpeed);
+        }
+    }
+
+    updatePaddleAI(paddle, aiSpeed) {
+        const isGravityStage = this.isGravityStage;
+        const dist = Phaser.Math.Distance.Between(paddle.x, paddle.y, this.puck.x, this.puck.y);
+        let isStuck = false;
+
+        // "Stuck" logic: if paddle is between puck and its own wall
+        if (dist < this.PADDLE_RADIUS * 1.5) {
+            if (paddle.side === 'p2' && this.puck.x > paddle.x) isStuck = true;
+            if (paddle.side === 'p1' && this.puck.x < paddle.x) isStuck = true;
+        }
+
+        if (isStuck) {
+            const retreatX = (paddle.side === 'p1') ? (this.baseW * 0.15) : (this.baseW * 0.85);
+            const retreatY = this.fieldY + this.fieldH / 2;
+            if (isGravityStage) {
+                const dir = (retreatX > paddle.x) ? 1 : -1;
+                paddle.setVelocityX(dir * aiSpeed);
+            } else {
+                this.physics.moveTo(paddle.sprite, retreatX, retreatY, aiSpeed * 0.7);
             }
-
-            if (isStuck) {
-                // Retreat logic - Back off to 85% width (safer from wall)
-                const retreatX = this.baseW * 0.85;
-                const retreatY = this.fieldY + this.fieldH / 2;
-
-                if (isGravityStage) {
-                    // Gravity Retreat: Move Right
-                    const dir = (retreatX > this.paddle2.x) ? 1 : -1;
-                    this.paddle2.setVelocityX(dir * 300);
-                    // Allow gravity fall
+        } else {
+            if (isGravityStage) {
+                const dx = this.puck.x - paddle.x;
+                const dy = this.puck.y - paddle.y;
+                if (Math.abs(dx) > 10) {
+                    paddle.setVelocityX(dx > 0 ? aiSpeed : -aiSpeed);
                 } else {
-                    this.physics.moveTo(this.paddle2.sprite, retreatX, retreatY, 200);
+                    paddle.setVelocityX(0);
+                }
+                if (dy < -80 && paddle.sprite.body.blocked.down) {
+                    paddle.setVelocityY(-550);
                 }
             } else {
-                // Normal Chase / Attack
-                if (isGravityStage) {
-                    // Platformer AI
-                    const dx = this.puck.x - this.paddle2.x;
-                    const dy = this.puck.y - this.paddle2.y;
+                // Introduce jitter to targeting to avoid infinite loops
+                const phase = (paddle.side === 'p1') ? 0 : Math.PI;
+                const jitter = Math.sin((this.time.now / 200) + phase) * 45;
+                const targetY = Phaser.Math.Clamp(this.puck.y + jitter, this.fieldY + this.PADDLE_RADIUS, this.fieldY + this.fieldH - this.PADDLE_RADIUS);
 
-                    // Horizontal Movement
-                    if (Math.abs(dx) > 10) {
-                        this.paddle2.setVelocityX(dx > 0 ? 300 : -300);
-                    } else {
-                        this.paddle2.setVelocityX(0);
-                    }
-
-                    // Vertical: Jump if puck is high
-                    if (dy < -80 && this.paddle2.sprite.body.blocked.down) {
-                        this.paddle2.setVelocityY(-550);
-                    }
-                } else {
-                    // Top-Down AI
-                    // Prevent AI from repeatedly ramming wall in Madness Mode
-                    // If target is beyond safe bounds, clamp it or stop?
-                    // Actually, if simply chasing puck, let it crash (it's "Madness").
-                    // BUT for "Stuck" logic above, we fixed retreatX.
-                    this.physics.moveTo(this.paddle2.sprite, this.puck.x, this.puck.y, 300 * this.scaleFactor);
-                }
+                this.physics.moveTo(paddle.sprite, this.puck.x, targetY, aiSpeed);
             }
         }
     }
 
     checkGoals() {
         if (!this.puck) return;
-        const centerX = this.baseW / 2;
-        const centerY = this.fieldY + this.fieldH / 2;
 
-        // Determine Goal Y Position
-        const goalY = (this.isGravityStage) ? (this.fieldY + this.fieldH - this.GOAL_SIZE / 2) : (centerY);
+        // Goal detection threshold (radius + buffer)
+        const threshold = this.puck.radius + 30;
 
-        // Increase threshold to 50 (radius 20 + 30 buffer) to catch fast bounces
-        if (this.puck.x < 50 && Math.abs(this.puck.y - goalY) < this.GOAL_SIZE / 2 + 20) this.onGoal('p2');
-        if (this.puck.x > this.baseW - 50 && Math.abs(this.puck.y - goalY) < this.GOAL_SIZE / 2 + 20) this.onGoal('p1');
+        // P1 Goal (Left side, defended by P1/Goalie)
+        if (this.puck.x < threshold) {
+            const goalCenterY = this.goal1Y + this.GOAL_SIZE / 2;
+            if (Math.abs(this.puck.y - goalCenterY) < this.GOAL_SIZE / 2 + 20) {
+                this.onGoal('p2');
+            }
+        }
+
+        // P2 Goal (Right side, defended by P2)
+        if (this.puck.x > this.baseW - threshold) {
+            const goalCenterY = this.goal2Y + this.GOAL_SIZE / 2;
+            if (Math.abs(this.puck.y - goalCenterY) < this.GOAL_SIZE / 2 + 20) {
+                this.onGoal('p1');
+            }
+        }
     }
 
     onGoal(scorer) {

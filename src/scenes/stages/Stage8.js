@@ -18,10 +18,10 @@ export class Stage8 extends BaseGameScene {
         this.p2SpawnY = centerY;
 
         // P1 is normal
-        this.paddle1 = new Paddle(this, this.p1SpawnX, this.p1SpawnY, this.PADDLE_RADIUS, 0xff0000, 0xffaaaa);
+        this.paddle1 = new Paddle(this, this.p1SpawnX, this.p1SpawnY, this.PADDLE_RADIUS, 0xff0000, 0xffaaaa, 'p1');
 
         // P2 is the BOSS: 5 times bigger
-        this.paddle2 = new Paddle(this, this.p2SpawnX, this.p2SpawnY, this.bossRadius, 0x0000ff, 0xaaaaff);
+        this.paddle2 = new Paddle(this, this.p2SpawnX, this.p2SpawnY, this.bossRadius, 0x0000ff, 0xaaaaff, 'p2');
 
         this.createPuck();
     }

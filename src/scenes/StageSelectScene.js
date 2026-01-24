@@ -93,6 +93,15 @@ const STAGES = [
             g.fillStyle(0xff0000); g.fillCircle(15, h - 25, 5); // P1 Ball
             g.fillStyle(0x0000ff); g.fillCircle(w - 15, h - 25, 5); // P2 Ball
         }
+    },
+    {
+        id: 10, name: "GOALIE!",
+        desc: "Protect your goal!",
+        render: (g, w, h) => {
+            g.lineStyle(2, 0x444444); g.strokeRect(0, 0, w, h);
+            g.fillStyle(0xaa0000); g.fillRect(0, h / 3, 5, h / 3);
+            g.fillStyle(0x0000ff); g.fillRect(w - 5, h / 4, 5, h / 2);
+        }
     }
 ];
 
@@ -109,6 +118,13 @@ export class StageSelectScene extends Phaser.Scene {
 
         // Header
         this.add.text(600, 40, Localization.get('SELECT_STAGE'), { fontSize: '50px', fill: '#ffffff', fontStyle: 'bold' }).setOrigin(0.5);
+
+        // Shop Button (Top Right)
+        const shopBtn = this.add.text(1150, 40, '🛒 SHOP', { fontSize: '32px', fill: '#00ff00', fontStyle: 'bold' })
+            .setOrigin(1, 0.5).setInteractive({ useHandCursor: true })
+            .on('pointerdown', () => this.scene.start('ShopScene'))
+            .on('pointerover', () => shopBtn.setScale(1.1))
+            .on('pointerout', () => shopBtn.setScale(1.0));
 
         // Grid Layout
         const startX = 250;

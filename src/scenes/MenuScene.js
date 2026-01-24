@@ -16,6 +16,13 @@ export class MenuScene extends Phaser.Scene {
         this.add.text(50, 50, 'C', { fontSize: '24px', fill: '#000000', fontStyle: 'bold' }).setOrigin(0.5);
         this.add.text(80, 50, 'x ' + coins, { fontSize: '32px', fill: '#ffff00' }).setOrigin(0, 0.5);
 
+        // Shop Button
+        const shopBtn = this.add.text(1100, 50, '🛒 SHOP', { fontSize: '32px', fill: '#00ff00', fontStyle: 'bold' })
+            .setOrigin(1, 0.5).setInteractive({ useHandCursor: true })
+            .on('pointerdown', () => this.scene.start('ShopScene'))
+            .on('pointerover', () => shopBtn.setScale(1.1))
+            .on('pointerout', () => shopBtn.setScale(1.0));
+
         this.createButton(600, 350, Localization.get('BTN_1P'), '#00ff00', () => this.scene.start('StageSelectScene', { mode: '1p' }));
         this.createButton(600, 450, Localization.get('BTN_2P'), '#0000ff', () => this.scene.start('StageSelectScene', { mode: '2p', isFreePlay: true }));
         // 2P now goes through Stage Select

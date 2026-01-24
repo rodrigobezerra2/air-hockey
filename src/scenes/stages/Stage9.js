@@ -228,7 +228,10 @@ export class Stage9 extends BaseGameScene {
         this.p2SpawnX = this.baseW - 50;
         this.p2SpawnY = this.fieldH - 50;
 
-        super.setupEntities();
+        this.paddle1 = new Paddle(this, this.p1SpawnX, this.p1SpawnY, this.PADDLE_RADIUS, 0xff0000, 0xffaaaa, 'p1');
+        this.paddle2 = new Paddle(this, this.p2SpawnX, this.p2SpawnY, this.PADDLE_RADIUS, 0x0000ff, 0xaaaaff, 'p2');
+
+        this.createPuck();
     }
 
     startReadyGoSequence(scorer = null) {
