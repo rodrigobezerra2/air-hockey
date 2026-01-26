@@ -37,14 +37,19 @@ export class Puck {
                 const vy = oldBody.velocity.y;
                 const oldX = this.sprite.x;
                 const oldY = this.sprite.y;
+                const oldMass = oldBody.mass;
+                const oldBounceX = oldBody.bounce.x;
+                const oldBounceY = oldBody.bounce.y;
+                const oldDrag = oldBody.drag.x;
 
                 this.sprite.destroy();
                 this.sprite = this.scene.physics.add.sprite(oldX, oldY, skinId);
                 this.sprite.setDisplaySize(this.radius * 2, this.radius * 2);
                 this.sprite.body.setCircle(this.radius);
                 this.sprite.body.setCollideWorldBounds(true);
-                this.sprite.body.setBounce(0.9, 0.9);
-                this.sprite.body.setDrag(50);
+                this.sprite.body.setBounce(oldBounceX, oldBounceY);
+                this.sprite.body.setDrag(oldDrag);
+                this.sprite.body.setMass(oldMass);
                 this.sprite.body.setVelocity(vx, vy);
             }
         }

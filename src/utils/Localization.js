@@ -30,8 +30,14 @@ const STRINGS = {
         'STAGE_8_NAME': 'BOSS!', 'STAGE_8_DESC': 'Time to defeat the boss!',
         'STAGE_9_NAME': 'CANNONS!', 'STAGE_9_DESC': 'Blast off!',
         'STAGE_10_NAME': 'GOALIE!', 'STAGE_10_DESC': 'Protect your goal!',
+        'STAGE_11_NAME': 'BOSS WALL!', 'STAGE_11_DESC': 'Defeat the wall boss to score goals!',
+        'STAGE_12_NAME': 'HOT POTATO', 'STAGE_12_DESC': 'Make sure the hot potato is not on your side when the timer runs out!',
+        'STAGE_13_NAME': 'LASER DISCO', 'STAGE_13_DESC': 'Fire lasers to create more pucks!',
+        'STAGE_14_NAME': 'ULTRA LASER DISCO', 'STAGE_14_DESC': '10x pucks! 10x lasers! 1000 goals!',
+        'STAGE_15_NAME': 'TUG-OF-WAR',
+        'STAGE_15_DESC': 'Mash buttons to push the giant puck!',
+        'STAGE_15_INSTRUCTIONS': 'MASH ANY KEY TO PUSH!',
         'MADNESS_MODE_ENABLED': 'FREEDOM MODE',
-        'QUIT': 'QUIT',
         'QUIT': 'QUIT',
         'RESUME': 'RESUME',
         'SOUND_ON': 'SOUND: ON',
@@ -45,7 +51,10 @@ const STRINGS = {
         'CONTINUE': 'CONTINUE',
         'GOALS_P1': 'Goals (P1)',
         'COINS': 'coins',
-        'WIN_BONUS': 'Win Bonus'
+        'WIN_BONUS': 'Win Bonus',
+        'P1_WINS': 'PLAYER 1 WINS!',
+        'P2_WINS': 'PLAYER 2 WINS!',
+        'CPU_WINS': 'CPU WINS!'
     },
     cy: {
         'MENU_TITLE': 'HOCI AWYR',
@@ -64,8 +73,14 @@ const STRINGS = {
         'STAGE_8_NAME': 'BÔS!', 'STAGE_8_DESC': 'Amser i drechu\'r bôs!',
         'STAGE_9_NAME': 'CANONAU!', 'STAGE_9_DESC': 'Ffwrdd â chi!',
         'STAGE_10_NAME': 'GÔL-GEIDWAD!', 'STAGE_10_DESC': 'Amddiffynwch eich gôl!',
+        'STAGE_11_NAME': 'WAL Y BÔS!', 'STAGE_11_DESC': 'Trechwch y bôs wal i sgorio goliau!',
+        'STAGE_12_NAME': 'TATWS POETH', 'STAGE_12_DESC': 'Gwnewch yn siŵr nad yw\'r tatws poeth ar eich ochr chi pan fydd yr amserydd yn dod i ben!',
+        'STAGE_13_NAME': 'DISCO LASER', 'STAGE_13_DESC': 'Saethu laserau i greu mwy o bygiau!',
+        'STAGE_14_NAME': 'DISCO ULTRA LASER', 'STAGE_14_DESC': '10x bygiau! 10x laserau! 1000 nod!',
+        'STAGE_15_NAME': 'TYNNU RHAFF',
+        'STAGE_15_DESC': 'Gwasgwch S i wthio\'r puck anferth!',
+        'STAGE_15_INSTRUCTIONS': 'GWASGWCH S I WTHIO!',
         'MADNESS_MODE_ENABLED': 'MODD RHYDDID',
-        'QUIT': 'GADAEL',
         'QUIT': 'GADAEL',
         'RESUME': 'AILDDECHRAU',
         'SOUND_ON': 'SAIN: YMLAEN',
@@ -79,7 +94,10 @@ const STRINGS = {
         'CONTINUE': 'PARHAU',
         'GOALS_P1': 'Goliau (P1)',
         'COINS': 'ceiniogau',
-        'WIN_BONUS': 'Bonws Ennill'
+        'WIN_BONUS': 'Bonws Ennill',
+        'P1_WINS': 'CHWARAEWR 1 YN ENNILL!',
+        'P2_WINS': 'CHWARAEWR 2 YN ENNILL!',
+        'CPU_WINS': 'CPU YN ENNILL!'
     },
     pt: {
         'MENU_TITLE': 'HÓQUEI DE MESA',
@@ -98,8 +116,14 @@ const STRINGS = {
         'STAGE_8_NAME': 'CHEFE!', 'STAGE_8_DESC': 'Hora de derrotar o chefe!',
         'STAGE_9_NAME': 'CANHÕES!', 'STAGE_9_DESC': 'Lançar!',
         'STAGE_10_NAME': 'GOLEIRO!', 'STAGE_10_DESC': 'Proteja seu gol!',
+        'STAGE_11_NAME': 'PAREDE CHEFE!', 'STAGE_11_DESC': 'Derrote a parede chefe para marcar gols!',
+        'STAGE_12_NAME': 'BATATA QUENTE', 'STAGE_12_DESC': 'Certifique-se de que a batata quente não esteja do seu lado quando o tempo acabar!',
+        'STAGE_13_NAME': 'DISCO LASER', 'STAGE_13_DESC': 'Atire lasers para criar mais discos!',
+        'STAGE_14_NAME': 'ULTRA DISCO LASER', 'STAGE_14_DESC': '10x discos! 10x lasers! 1000 gols!',
+        'STAGE_15_NAME': 'CABO DE GUERRA',
+        'STAGE_15_DESC': 'Aperte S para empurrar o disco gigante!',
+        'STAGE_15_INSTRUCTIONS': 'APERTE S!',
         'MADNESS_MODE_ENABLED': 'MODO LIBERDADE',
-        'QUIT': 'SAIR',
         'QUIT': 'SAIR',
         'RESUME': 'CONTINUAR',
         'SOUND_ON': 'SOM: LIGADO',
@@ -113,7 +137,10 @@ const STRINGS = {
         'CONTINUE': 'CONTINUAR',
         'GOALS_P1': 'Gols (P1)',
         'COINS': 'moedas',
-        'WIN_BONUS': 'Bônus de Vitória'
+        'WIN_BONUS': 'Bônus de Vitória',
+        'P1_WINS': 'JOGADOR 1 VENCEU!',
+        'P2_WINS': 'JOGADOR 2 VENCEU!',
+        'CPU_WINS': 'CPU VENCEU!'
     }
 };
 

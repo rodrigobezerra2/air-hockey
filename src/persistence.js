@@ -17,7 +17,8 @@ export const Persistence = {
                     hardMode: false,
                     halfSpeed: false,
                     twiceSpeed: false,
-                    knockback: false
+                    knockback: false,
+                    yingYang: false
                 }
             }
         };

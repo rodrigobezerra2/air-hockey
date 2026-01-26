@@ -13,6 +13,11 @@ import { Stage7 } from './scenes/stages/Stage7.js';
 import { Stage8 } from './scenes/stages/Stage8.js';
 import { Stage9 } from './scenes/stages/Stage9.js';
 import { Stage10 } from './scenes/stages/Stage10.js';
+import { Stage11 } from './scenes/stages/Stage11.js';
+import { Stage12 } from './scenes/stages/Stage12.js';
+import { Stage13 } from './scenes/stages/Stage13.js';
+import { Stage14 } from './scenes/stages/Stage14.js';
+import { Stage15 } from './scenes/stages/Stage15.js';
 import { ShopScene } from './scenes/ShopScene.js';
 
 const config = {
@@ -37,6 +42,11 @@ const config = {
         Stage8,
         Stage9,
         Stage10,
+        Stage11,
+        Stage12,
+        Stage13,
+        Stage14,
+        Stage15,
         ShopScene
     ]
 };

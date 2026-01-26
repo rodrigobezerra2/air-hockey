@@ -5,6 +5,7 @@ export const VanityManager = {
         { id: 'eyes_targeting', category: 'eyes', name: 'Targeting Eyes', cost: 1000, type: 'paddle' },
         { id: 'eyes_pirate', category: 'eyes', name: 'Pirate Eyes', cost: 1000, type: 'paddle' },
         { id: 'eyes_moving', category: 'eyes', name: 'Spinning Eyes', cost: 500, type: 'paddle' },
+        { id: 'eyes_cyclops', category: 'eyes', name: 'Cyclops Goggles', cost: 1500, type: 'paddle' },
         { id: 'mouth_happy', category: 'mouth', name: 'Happy Mouth', cost: 500, type: 'paddle' },
         { id: 'mouth_sad', category: 'mouth', name: 'Sad Mouth', cost: 500, type: 'paddle' },
         { id: 'mouth_bunny', category: 'mouth', name: 'Bunny Teeth', cost: 500, type: 'paddle' },
@@ -33,7 +34,8 @@ export const VanityManager = {
         { id: 'mod_hard', category: 'modifier', name: 'Hard Mode', cost: 1000, type: 'modifier', modId: 'hardMode' },
         { id: 'mod_half', category: 'modifier', name: 'Half Speed', cost: 1000, type: 'modifier', modId: 'halfSpeed' },
         { id: 'mod_twice', category: 'modifier', name: 'Twice Speed', cost: 1000, type: 'modifier', modId: 'twiceSpeed' },
-        { id: 'mod_knockback', category: 'modifier', name: 'Puck Knockback', cost: 1000, type: 'modifier', modId: 'knockback' }
+        { id: 'mod_knockback', category: 'modifier', name: 'Puck Knockback', cost: 1000, type: 'modifier', modId: 'knockback' },
+        { id: 'mod_yingyang', category: 'modifier', name: 'Ying Yang', cost: 500, type: 'modifier', modId: 'yingYang' }
     ],
 
     generateTextures(scene) {
@@ -42,6 +44,7 @@ export const VanityManager = {
         this.generateTargetingEyes(scene);
         this.generatePirateEyes(scene);
         this.generateMovingEyes(scene);
+        this.generateCyclopsGoggles(scene);
         this.generateHappyMouth(scene);
         this.generateSadMouth(scene);
         this.generateBunnyMouth(scene);
@@ -75,6 +78,7 @@ export const VanityManager = {
         this.generateModHalfIcon(scene);
         this.generateModTwiceIcon(scene);
         this.generateModKnockbackIcon(scene);
+        this.generateModYingYangIcon(scene);
     },
 
     generateCrossedEyes(scene) {
@@ -158,6 +162,28 @@ export const VanityManager = {
             gIcon.generateTexture('eyes_moving', 40, 20);
             gIcon.destroy();
         }
+    },
+
+    generateCyclopsGoggles(scene) {
+        if (scene.textures.exists('eyes_cyclops')) return;
+        const g = scene.make.graphics({ add: false });
+
+        // Characteristic yellow/gold frame (thick band)
+        g.fillStyle(0xffcc00);
+        g.fillRoundedRect(0, 5, 45, 10, 4);
+        g.lineStyle(1, 0x000000);
+        g.strokeRoundedRect(0, 5, 45, 10, 4);
+
+        // Ruby-red visor slit
+        g.fillStyle(0xff0000);
+        g.fillRect(5, 8, 35, 4);
+
+        // Glowing highlights
+        g.fillStyle(0xffaaaa, 0.6);
+        g.fillRect(8, 9, 10, 2);
+
+        g.generateTexture('eyes_cyclops', 45, 20);
+        g.destroy();
     },
 
     generateHappyMouth(scene) {
@@ -450,5 +476,22 @@ export const VanityManager = {
         g.fillStyle(0x333344); g.fillRect(10, 20, 20, 40); g.fillRect(40, 10, 25, 50); // Buildings
         g.fillStyle(0xffff00); g.fillRect(15, 25, 4, 4); g.fillRect(45, 15, 4, 4); // Windows
         g.generateTexture('world_city', 80, 60); g.destroy();
+    },
+
+    generateModYingYangIcon(scene) {
+        if (scene.textures.exists('mod_yingyang')) return;
+        const g = scene.make.graphics({ add: false });
+        const w = 80, h = 60;
+        g.fillStyle(0x000000); g.fillRect(0, 0, w, h);
+        const r = 25;
+        const cx = w / 2, cy = h / 2;
+        g.fillStyle(0xffffff); g.fillCircle(cx, cy, r); // White half
+        g.fillStyle(0x000000); g.beginPath(); g.arc(cx, cy, r, -Math.PI / 2, Math.PI / 2, false); g.fillPath(); // Black half
+        g.fillCircle(cx, cy - r / 2, r / 2); // Top middle circle black
+        g.fillStyle(0xffffff); g.fillCircle(cx, cy + r / 2, r / 2); // Bottom middle circle white
+        g.fillCircle(cx, cy - r / 2, r / 4); // Small white dot in black
+        g.fillStyle(0x000000); g.fillCircle(cx, cy + r / 2, r / 4); // Small black dot in white
+        g.lineStyle(2, 0xffffff); g.strokeCircle(cx, cy, r);
+        g.generateTexture('mod_yingyang', w, h); g.destroy();
     }
 };

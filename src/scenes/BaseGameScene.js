@@ -25,6 +25,9 @@ export class BaseGameScene extends Phaser.Scene {
         this.goal1Y = 0; // Relative to field
         this.goal2Y = 0; // Relative to field
         this.fieldGraphics = null;
+        this.goalGraphics = null;
+        this.isSplitMode = false;
+        this.paddle1B = null;
     }
 
     create() {
@@ -41,6 +44,7 @@ export class BaseGameScene extends Phaser.Scene {
         // Setup Inputs
         this.cursors = this.input.keyboard.createCursorKeys();
         this.keysWASD = this.input.keyboard.addKeys({ up: Phaser.Input.Keyboard.KeyCodes.W, down: Phaser.Input.Keyboard.KeyCodes.S, left: Phaser.Input.Keyboard.KeyCodes.A, right: Phaser.Input.Keyboard.KeyCodes.D });
+        this.keyY = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Y);
         this.input.addPointer(2);
 
         this.setupEntities();
@@ -70,24 +74,31 @@ export class BaseGameScene extends Phaser.Scene {
 
         const bgId = Persistence.getEquipped('world', 'background');
 
-        // Use a persistent graphics object if not already created
-        if (!this.fieldGraphics) {
-            this.fieldGraphics = this.add.graphics();
-        }
+        // Use persistent graphics objects
+        if (!this.fieldGraphics) this.fieldGraphics = this.add.graphics();
+        if (!this.goalGraphics) this.goalGraphics = this.add.graphics();
+
         const g = this.fieldGraphics;
         g.clear();
 
-        // 1. Theme-Specific Background
+        // 1. Theme-Specific Background (Static)
         this.drawWorldBackground(g, bgId);
 
-        // 2. Field Lines
-        g.lineStyle(4, 0xffffff, 0.2); // Faint white lines
+        // 2. Field Lines (Static)
+        g.lineStyle(4, 0xffffff, 0.2);
         g.strokeRect(0, this.fieldY, this.baseW, this.fieldH);
         const centerX = this.baseW / 2, centerY = this.fieldY + this.fieldH / 2;
         g.beginPath(); g.moveTo(centerX, this.fieldY); g.lineTo(centerX, this.fieldY + this.fieldH); g.strokePath();
         g.strokeCircle(centerX, centerY, 100 * this.scaleFactor);
 
-        // 3. Goals
+        // 3. Goals (Initial draw)
+        this.drawGoals();
+    }
+
+    drawGoals() {
+        if (!this.goalGraphics) return;
+        const g = this.goalGraphics;
+        g.clear();
         g.fillStyle(0xaa0000, 0.5); g.fillRect(0, this.goal1Y, 10 * this.scaleFactor, this.GOAL_SIZE);
         g.fillStyle(0x0000aa, 0.5); g.fillRect(this.baseW - 10 * this.scaleFactor, this.goal2Y, 10 * this.scaleFactor, this.GOAL_SIZE);
     }
@@ -220,19 +231,24 @@ export class BaseGameScene extends Phaser.Scene {
         const centerY = this.fieldY + this.fieldH / 2;
         let radius = 20 * this.scaleFactor;
         this.puck = new Puck(this, this.baseW / 2, centerY, radius);
-        this.physics.add.collider(this.puck.sprite, this.paddle1.sprite, (p, pad) => this.hitPaddle(p, pad));
-        this.physics.add.collider(this.puck.sprite, this.paddle2.sprite, (p, pad) => this.hitPaddle(p, pad));
+        if (this.paddle1) this.physics.add.collider(this.puck.sprite, this.paddle1.sprite, (p, pad) => this.hitPaddle(p, pad));
+        if (this.paddle2) this.physics.add.collider(this.puck.sprite, this.paddle2.sprite, (p, pad) => this.hitPaddle(p, pad));
     }
 
     hitPaddle(puck, paddle) {
         if (Persistence.isModifierActive('knockback')) {
-            const padObj = (paddle === this.paddle1.sprite) ? this.paddle1 : this.paddle2;
-            const angle = Phaser.Math.Angle.Between(puck.x, puck.y, paddle.x, paddle.y);
-            const force = 400;
-            padObj.setVelocity(Math.cos(angle) * force, Math.sin(angle) * force);
+            let padObj = null;
+            if (paddle === this.paddle1.sprite) padObj = this.paddle1;
+            else if (this.paddle1B && paddle === this.paddle1B.sprite) padObj = this.paddle1B;
+            else if (paddle === this.paddle2.sprite) padObj = this.paddle2;
+
+            if (padObj) {
+                const angle = Phaser.Math.Angle.Between(puck.x, puck.y, paddle.x, paddle.y);
+                const force = 400;
+                padObj.setVelocity(Math.cos(angle) * force, Math.sin(angle) * force);
+            }
         }
 
-        // ... velocity boost logic
         const angle = Phaser.Math.Angle.Between(paddle.x, paddle.y, puck.x, puck.y);
         const speed = Phaser.Math.Distance.Between(0, 0, puck.body.velocity.x, puck.body.velocity.y);
         const minSpeed = 350 * this.scaleFactor * (Persistence.isModifierActive('halfSpeed') ? 0.5 : 1);
@@ -257,21 +273,14 @@ export class BaseGameScene extends Phaser.Scene {
             if (this.crazyModeText) this.crazyModeText.setVisible(!this.restrictField);
         });
 
-        // Madness Mode Text
         this.crazyModeText = this.add.text(this.baseW / 2, 120, Localization.get('MADNESS_MODE_ENABLED'), {
             fontSize: '40px', fill: '#ffff00', fontStyle: 'bold'
         }).setOrigin(0.5).setVisible(!this.restrictField).setScrollFactor(0);
 
-        // Settings Cog (Top Right)
-        // Fixed to Screen (using this.scale.width, not world width)
         this.add.text(this.scale.width - 50, 50, '⚙️', { fontSize: '40px' })
             .setOrigin(0.5).setInteractive().setScrollFactor(0)
             .on('pointerdown', () => this.openSettings());
 
-        // Mobile Controls (If touch detected)
-        // Check touch or just add them for testing if requested. 
-        // Mobile Controls (If touch detected AND not on desktop)
-        // Ensure strictly mobile/tablet experience
         if (!this.sys.game.device.os.desktop && this.sys.game.device.input.touch) {
             this.createVirtualControls();
         }
@@ -282,11 +291,8 @@ export class BaseGameScene extends Phaser.Scene {
         this.isPaused = true;
         this.physics.world.pause();
 
-        // Create Modal Container
         this.settingsModal = this.add.container(0, 0).setScrollFactor(0).setDepth(100);
 
-        // Background (dim)
-        // Panel Border
         const panelW = 500;
         const panelH = 600;
         const panel = this.add.graphics();
@@ -297,21 +303,16 @@ export class BaseGameScene extends Phaser.Scene {
         panel.fillRectShape(panelRect);
         this.settingsModal.add(panel);
 
-        // Background (dim) - Click to Resume
         const bg = this.add.rectangle(this.baseW / 2, this.baseH / 2, this.baseW, this.baseH, 0x000000, 0.8)
             .setInteractive()
             .on('pointerdown', (pointer) => {
-                // Check if click is outside panel
                 if (!panelRect.contains(pointer.x, pointer.y)) {
                     this.closeSettings();
                 }
             });
         this.settingsModal.add(bg);
-
-        // Ensure background is BEHIND panel (panel was added first, so send bg to back)
         this.settingsModal.sendToBack(bg);
 
-        // Standard Button Style
         const createBtn = (y, label, callback, color = '#ffffff') => {
             const btnText = this.add.text(this.baseW / 2, y, label, {
                 fontSize: '40px', fill: color, fontStyle: 'bold'
@@ -324,10 +325,8 @@ export class BaseGameScene extends Phaser.Scene {
             return btnText;
         };
 
-        // Resume
         createBtn(this.baseH * 0.25, Localization.get('RESUME'), () => this.closeSettings());
 
-        // Language Flags (Row)
         const langs = Localization.getAllLanguages();
         const langY = this.baseH * 0.51;
         const langGap = 100;
@@ -335,22 +334,19 @@ export class BaseGameScene extends Phaser.Scene {
 
         langs.forEach((lang, index) => {
             const x = langStartX + index * langGap;
-            const flagKey = Localization.getFlag(lang); // Returns texture key 'flag_en', etc.
+            const flagKey = Localization.getFlag(lang);
             const isSelected = (Localization.getCurrentLanguage() === lang);
 
-            // Background for selection
             if (isSelected) {
                 const bg = this.add.rectangle(x, langY, 70, 54, 0x444444).setOrigin(0.5);
                 this.settingsModal.add(bg);
             }
 
-            // Using this.add.image instead of text
             const flagBtn = this.add.image(x, langY, flagKey).setOrigin(0.5).setInteractive();
             flagBtn.setDisplaySize(60, 40);
 
             flagBtn.on('pointerdown', () => {
                 Localization.setLanguage(lang);
-                // Restart Settings to refresh text
                 this.settingsModal.destroy();
                 this.isPaused = false;
                 this.openSettings();
@@ -362,13 +358,11 @@ export class BaseGameScene extends Phaser.Scene {
             this.settingsModal.add(flagBtn);
         });
 
-        // Stage Select
         createBtn(this.baseH * 0.64, Localization.get('STAGE_SELECT'), () => {
-            this.closeSettings(); // Clean up
+            this.closeSettings();
             this.scene.start('StageSelectScene');
         });
 
-        // Main Menu
         createBtn(this.baseH * 0.77, Localization.get('MAIN_MENU'), () => {
             this.closeSettings();
             this.scene.start('MenuScene');
@@ -395,7 +389,6 @@ export class BaseGameScene extends Phaser.Scene {
             const alpha = 0.3;
             const color = 0x888888;
 
-            // Helper to make button
             const makeBtn = (bx, by, keyDir, label) => {
                 const btn = this.add.circle(bx, by, size, color).setAlpha(alpha).setScrollFactor(0).setInteractive();
                 const text = this.add.text(bx, by, label, { fontSize: '32px', fontStyle: 'bold' }).setOrigin(0.5).setScrollFactor(0);
@@ -411,27 +404,26 @@ export class BaseGameScene extends Phaser.Scene {
             makeBtn(x + size * 1.5, y, 'right', isArrows ? '→' : 'D');
         };
 
-        // P1 D-Pad (Left Bottom)
         createDPad(150, this.baseH - 150, 'p1', false);
-
-        // P2 D-Pad (Right Bottom)
         createDPad(this.baseW - 150, this.baseH - 150, 'p2', true);
     }
 
     update(time, delta) {
         if (this.matchEnded || this.isPaused || this.isWaitingForStart) return;
 
-        // Apply Speed Modifiers
+        if (Phaser.Input.Keyboard.JustDown(this.keyY) && this.gameMode === '1p' && Persistence.isModifierActive('yingYang')) {
+            this.toggleSplitMode();
+        }
+
         let speedMult = 1;
         if (Persistence.isModifierActive('halfSpeed')) speedMult = 0.5;
         if (Persistence.isModifierActive('twiceSpeed')) speedMult = 2;
 
-        // --- Player 1 Input ---
-        let p1Vx = 0, p1Vy = 0;
         const isGravityStage = this.isGravityStage;
         const baseSpeed = 600 * speedMult;
 
-        // Combine Keyboard & Virtual
+        let p1Vx = 0, p1Vy = 0;
+
         const k1 = this.keysWASD;
         const v1 = this.virtualInput ? this.virtualInput.p1 : { up: false, down: false, left: false, right: false };
 
@@ -440,9 +432,7 @@ export class BaseGameScene extends Phaser.Scene {
         const left = k1.left.isDown || v1.left;
         const right = k1.right.isDown || v1.right;
 
-        // P1 Movement logic
         if (isGravityStage) {
-            // Gravity Logic...
             if (left) p1Vx = -baseSpeed;
             else if (right) p1Vx = baseSpeed;
 
@@ -452,7 +442,6 @@ export class BaseGameScene extends Phaser.Scene {
                 this.paddle1.setVelocityY(baseSpeed);
             }
         } else {
-            // Classic Logic
             if (up) p1Vy = -baseSpeed;
             else if (down) p1Vy = baseSpeed;
 
@@ -460,7 +449,6 @@ export class BaseGameScene extends Phaser.Scene {
             else if (right) p1Vx = baseSpeed;
         }
 
-        // Direct Touch Logic
         if (this.input.activePointer.isDown) {
             const ptr = this.input.activePointer;
             const isTouchingUI = (ptr.y > this.baseH - 250 && (ptr.x < 300 || ptr.x > this.baseW - 300)) && (this.virtualInput);
@@ -490,15 +478,43 @@ export class BaseGameScene extends Phaser.Scene {
             }
         }
 
-        // Apply P1
         if (isGravityStage) {
             if (!this.paddle1.stunned) this.paddle1.setVelocityX(p1Vx);
         } else {
             if (!this.paddle1.stunned) this.paddle1.setVelocity(p1Vx, p1Vy);
         }
 
-        // --- Player 2 Input ---
-        if (this.gameMode === '2p') {
+        if (this.isSplitMode && this.paddle1B) {
+            let p1bVx = 0, p1bVy = 0;
+            const kSplit = this.cursors;
+            const vSplit = this.virtualInput ? this.virtualInput.p2 : { up: false, down: false, left: false, right: false };
+
+            const upB = kSplit.up.isDown || vSplit.up;
+            const downB = kSplit.down.isDown || vSplit.down;
+            const leftB = kSplit.left.isDown || vSplit.left;
+            const rightB = kSplit.right.isDown || vSplit.right;
+
+            if (isGravityStage) {
+                if (leftB) p1bVx = -baseSpeed;
+                else if (rightB) p1bVx = baseSpeed;
+                if (upB && this.paddle1B.sprite.body.blocked.down) this.paddle1B.setVelocityY(-baseSpeed);
+                else if (downB) this.paddle1B.setVelocityY(baseSpeed);
+                this.paddle1B.setVelocityX(p1bVx);
+            } else {
+                if (upB) p1bVy = -baseSpeed;
+                else if (downB) p1bVy = baseSpeed;
+                if (leftB) p1bVx = -baseSpeed;
+                else if (rightB) p1bVx = baseSpeed;
+                this.paddle1B.setVelocity(p1bVx, p1bVy);
+            }
+
+            if (this.restrictField && this.paddle1B.x > this.baseW / 2 - this.paddle1B.radius) {
+                this.paddle1B.x = this.baseW / 2 - this.paddle1B.radius;
+                if (this.paddle1B.body.velocity.x > 0) this.paddle1B.setVelocityX(0);
+            }
+        }
+
+        if (this.gameMode === '2p' && this.paddle2) {
             let p2Vx = 0, p2Vy = 0;
             const k2 = this.cursors;
             const v2 = this.virtualInput ? this.virtualInput.p2 : { up: false, down: false, left: false, right: false };
@@ -508,7 +524,6 @@ export class BaseGameScene extends Phaser.Scene {
             const left2 = k2.left.isDown || v2.left;
             const right2 = k2.right.isDown || v2.right;
 
-            // P2 Logic
             if (left2) p2Vx = -baseSpeed;
             else if (right2) p2Vx = baseSpeed;
 
@@ -522,17 +537,13 @@ export class BaseGameScene extends Phaser.Scene {
                 this.paddle2.setVelocity(p2Vx, p2Vy);
             }
         }
+
         if (this.restrictField) {
-            // P1 Bounds (Left Half)
-            // Right limit for P1: baseW/2 - radius
             if (this.paddle1.x > this.baseW / 2 - this.PADDLE_RADIUS) {
                 this.paddle1.x = this.baseW / 2 - this.PADDLE_RADIUS;
                 if (this.paddle1.body.velocity.x > 0) this.paddle1.setVelocityX(0);
             }
-
-            // P2 Bounds (Right Half)
-            // Left limit for P2: baseW/2 + radius
-            if (this.paddle2.x < this.baseW / 2 + this.PADDLE_RADIUS) {
+            if (this.paddle2 && this.paddle2.x < this.baseW / 2 + this.PADDLE_RADIUS) {
                 this.paddle2.x = this.baseW / 2 + this.PADDLE_RADIUS;
                 if (this.paddle2.body.velocity.x < 0) this.paddle2.setVelocityX(0);
             }
@@ -541,39 +552,29 @@ export class BaseGameScene extends Phaser.Scene {
         this.handleAI();
         this.checkGoals();
 
-        // In Goalie Mode, re-draw field EVERY frame if goals move
         if (this.isGoalieMode) {
-            // Handle input for P1 Goal
             const goalieSpeed = 800;
             const k1 = this.keysWASD;
             const v1 = this.virtualInput ? this.virtualInput.p1 : { up: false, down: false };
-            const up = k1.up.isDown || v1.up;
-            const down = k1.down.isDown || v1.down;
+            const upG = k1.up.isDown || v1.up;
+            const downG = k1.down.isDown || v1.down;
 
-            if (up) this.goal1Y -= goalieSpeed * (delta / 1000);
-            if (down) this.goal1Y += goalieSpeed * (delta / 1000);
+            if (upG) this.goal1Y -= goalieSpeed * (delta / 1000);
+            if (downG) this.goal1Y += goalieSpeed * (delta / 1000);
 
-            // Constraints
             this.goal1Y = Phaser.Math.Clamp(this.goal1Y, this.fieldY, this.fieldY + this.fieldH - this.GOAL_SIZE);
-
-            this.drawField();
+            this.drawGoals();
         }
     }
 
+
+
     handleAI() {
         if (!this.puck) return;
-
-        let aiSpeed = 300 * this.scaleFactor;
-        if (Persistence.isModifierActive('hardMode')) aiSpeed *= 2;
-
-        // --- P2 AI ---
-        if (this.gameMode === '1p' || this.isGoalieMode) {
-            this.updatePaddleAI(this.paddle2, aiSpeed);
-        }
-
-        // --- P1 AI ---
-        if (this.aiControlP1) {
-            this.updatePaddleAI(this.paddle1, aiSpeed);
+        if (this.gameMode === '1p' || this.aiControlP1 || this.aiControlP2) {
+            const aiSpeed = 400 * this.scaleFactor * (Persistence.isModifierActive('hardMode') ? 2 : 1);
+            if ((this.gameMode === '1p' || this.aiControlP2) && this.paddle2) this.updatePaddleAI(this.paddle2, aiSpeed);
+            if (this.aiControlP1 && this.paddle1) this.updatePaddleAI(this.paddle1, aiSpeed);
         }
     }
 
@@ -582,8 +583,7 @@ export class BaseGameScene extends Phaser.Scene {
         const dist = Phaser.Math.Distance.Between(paddle.x, paddle.y, this.puck.x, this.puck.y);
         let isStuck = false;
 
-        // "Stuck" logic: if paddle is between puck and its own wall
-        if (dist < this.PADDLE_RADIUS * 1.5) {
+        if (dist < paddle.radius * 1.5) {
             if (paddle.side === 'p2' && this.puck.x > paddle.x) isStuck = true;
             if (paddle.side === 'p1' && this.puck.x < paddle.x) isStuck = true;
         }
@@ -610,23 +610,42 @@ export class BaseGameScene extends Phaser.Scene {
                     paddle.setVelocityY(-550);
                 }
             } else {
-                // Introduce jitter to targeting to avoid infinite loops
                 const phase = (paddle.side === 'p1') ? 0 : Math.PI;
                 const jitter = Math.sin((this.time.now / 200) + phase) * 45;
-                const targetY = Phaser.Math.Clamp(this.puck.y + jitter, this.fieldY + this.PADDLE_RADIUS, this.fieldY + this.fieldH - this.PADDLE_RADIUS);
-
+                const targetY = Phaser.Math.Clamp(this.puck.y + jitter, this.fieldY + paddle.radius, this.fieldY + this.fieldH - paddle.radius);
                 this.physics.moveTo(paddle.sprite, this.puck.x, targetY, aiSpeed);
             }
         }
     }
 
+    toggleSplitMode() {
+        if (this.gameMode !== '1p') return;
+        this.isSplitMode = !this.isSplitMode;
+
+        if (this.isSplitMode) {
+            this.paddle1.radius = this.PADDLE_RADIUS / 1.5;
+            this.paddle1.refreshVanity();
+            this.paddle1.body.setCircle(this.paddle1.radius, -this.paddle1.radius, -this.paddle1.radius);
+
+            this.paddle1B = new Paddle(this, this.paddle1.x, this.paddle1.y + 60, this.paddle1.radius, 0xff0000, 0xffaaaa, 'p1');
+            this.physics.add.collider(this.puck.sprite, this.paddle1B.sprite, (p, pad) => this.hitPaddle(p, pad));
+            this.showFartCloud('left');
+        } else {
+            if (this.paddle1B) {
+                this.paddle1B.destroy();
+                this.paddle1B = null;
+            }
+            this.paddle1.radius = this.PADDLE_RADIUS;
+            this.paddle1.refreshVanity();
+            this.paddle1.body.setCircle(this.paddle1.radius, -this.paddle1.radius, -this.paddle1.radius);
+            this.showFartCloud('left');
+        }
+    }
+
     checkGoals() {
         if (!this.puck) return;
-
-        // Goal detection threshold (radius + buffer)
         const threshold = this.puck.radius + 30;
 
-        // P1 Goal (Left side, defended by P1/Goalie)
         if (this.puck.x < threshold) {
             const goalCenterY = this.goal1Y + this.GOAL_SIZE / 2;
             if (Math.abs(this.puck.y - goalCenterY) < this.GOAL_SIZE / 2 + 20) {
@@ -634,7 +653,6 @@ export class BaseGameScene extends Phaser.Scene {
             }
         }
 
-        // P2 Goal (Right side, defended by P2)
         if (this.puck.x > this.baseW - threshold) {
             const goalCenterY = this.goal2Y + this.GOAL_SIZE / 2;
             if (Math.abs(this.puck.y - goalCenterY) < this.GOAL_SIZE / 2 + 20) {
@@ -645,7 +663,6 @@ export class BaseGameScene extends Phaser.Scene {
 
     onGoal(scorer) {
         if (this.matchEnded || this.isWaitingForStart) return;
-
         this.isWaitingForStart = true;
 
         if (scorer === 'p1') {
@@ -661,15 +678,12 @@ export class BaseGameScene extends Phaser.Scene {
         }
 
         this.totalGoals++;
-
-        // Immediate Fireworks
         const goalX = (scorer === 'p1') ? this.baseW : 0;
         const goalY = this.fieldY + this.fieldH / 2;
         this.createFireworks(goalX, goalY);
 
         if (this.totalGoals >= 3) {
             this.matchEnded = true;
-            // Freeze movement
             if (this.puck) this.puck.body.setVelocity(0, 0);
             if (this.paddle1) this.paddle1.setVelocity(0, 0);
             if (this.paddle2) this.paddle2.setVelocity(0, 0);
@@ -686,17 +700,11 @@ export class BaseGameScene extends Phaser.Scene {
 
     showScoreText(scorer) {
         if (!scorer) return;
-        // Blinking SCORE
         const scoreSideX = (scorer === 'p1') ? this.baseW * 0.25 : this.baseW * 0.75;
         const scoreTxt = this.add.text(scoreSideX, this.fieldH / 2, 'SCORE', {
-            fontSize: '80px',
-            fill: '#ffffff',
-            fontStyle: 'bold',
-            stroke: '#000000',
-            strokeThickness: 8
+            fontSize: '80px', fill: '#ffffff', fontStyle: 'bold', stroke: '#000000', strokeThickness: 8
         }).setOrigin(0.5);
 
-        // Blink effect
         this.tweens.add({
             targets: scoreTxt,
             alpha: 0,
@@ -732,20 +740,11 @@ export class BaseGameScene extends Phaser.Scene {
     startReadyGoSequence(scorer = null) {
         this.isWaitingForStart = true;
         this.resetEntities();
-
-        // Show Score Text (synced with READY)
         if (scorer) this.showScoreText(scorer);
-
-        // Clear any old ready text
         if (this.readyText) this.readyText.destroy();
 
-        // READY...
         this.readyText = this.add.text(this.baseW / 2, 150, 'READY...', {
-            fontSize: '100px',
-            fill: '#ffff00',
-            fontStyle: 'bold',
-            stroke: '#000000',
-            strokeThickness: 10
+            fontSize: '100px', fill: '#ffff00', fontStyle: 'bold', stroke: '#000000', strokeThickness: 10
         }).setOrigin(0.5);
 
         this.time.delayedCall(1000, () => {
@@ -753,8 +752,7 @@ export class BaseGameScene extends Phaser.Scene {
                 this.readyText.setText('GO!');
                 this.readyText.setFill('#00ff00');
             }
-            this.isWaitingForStart = false; // Move now!
-
+            this.isWaitingForStart = false;
             this.time.delayedCall(1000, () => {
                 if (this.readyText) this.readyText.destroy();
                 this.readyText = null;
@@ -762,14 +760,13 @@ export class BaseGameScene extends Phaser.Scene {
         });
     }
 
-    showFartCloud(side) {
-        // Animation disabled
-    }
+    showFartCloud(side) { }
 
     resetEntities() {
         const centerY = this.fieldY + this.fieldH / 2;
         if (this.paddle1) this.paddle1.reset(this.p1SpawnX, this.p1SpawnY);
         if (this.paddle2) this.paddle2.reset(this.p2SpawnX, this.p2SpawnY);
+        if (this.isSplitMode && this.paddle1B) this.paddle1B.reset(this.p1SpawnX, this.p1SpawnY + 60);
         if (this.puck) this.puck.reset(this.baseW / 2, centerY);
     }
 

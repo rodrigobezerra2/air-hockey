@@ -11,7 +11,16 @@ export class ResultScene extends Phaser.Scene {
         const msg = p1Won ? Localization.get('STAGE_COMPLETED') : Localization.get('STAGE_FAILED');
         const msgColor = p1Won ? '#00ff00' : '#ff0000';
         this.add.text(600, 200, msg, { fontSize: '80px', fill: msgColor, fontStyle: 'bold' }).setOrigin(0.5);
-        this.add.text(600, 300, `${this.s1} - ${this.s2}`, { fontSize: '60px', fill: '#ffffff' }).setOrigin(0.5);
+
+        let winnerMsg = "";
+        if (this.s1 > this.s2) {
+            winnerMsg = Localization.get('P1_WINS');
+        } else if (this.s2 > this.s1) {
+            winnerMsg = (this.mode === '1p') ? Localization.get('CPU_WINS') : Localization.get('P2_WINS');
+        } else {
+            winnerMsg = Localization.get('DRAW');
+        }
+        this.add.text(600, 320, winnerMsg, { fontSize: '60px', fill: '#ffffff', fontStyle: 'bold' }).setOrigin(0.5);
 
         const txtGoals = Localization.get('GOALS_P1');
         const txtCoins = Localization.get('COINS');
